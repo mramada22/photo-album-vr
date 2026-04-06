@@ -19,6 +19,8 @@ document.querySelector('#app').innerHTML = `
     </div>
   </div>
 
+  <div id="fadeOverlay" class="fade-overlay"></div>
+
   <a-scene>
     <a-assets>
       <audio id="introAudio" src="/audio/Intro.mp3" preload="auto"></audio>
@@ -86,6 +88,8 @@ const enterTheaterButton = document.getElementById('enterTheaterButton');
 
 const welcomeOverlay = document.getElementById('welcomeOverlay');
 const theaterButtonOverlay = document.getElementById('theaterButtonOverlay');
+const fadeOverlay = document.getElementById('fadeOverlay');
+
 
 const introRoom = document.getElementById('introRoom');
 const theaterRoom = document.getElementById('theaterRoom');
@@ -111,13 +115,24 @@ introAudio.addEventListener('ended', () =>{
     theaterButtonOverlay.classList.remove('hidden');
 });
 
-enterTheaterButton.addEventListener('click', () =>{
+enterTheaterButton.addEventListener('click', async () =>{
     if(!introHasFinished) return;
 
     theaterButtonOverlay.classList.add('hidden');
 
+    //Fade to black before switching rooms
+    fadeOverlay.classList.add('visible');
+    await wait(1000);
+
+    //Swap Rooms during black screen
     introRoom.setAttribute('visible', 'false');
     theaterRoom.setAttribute('visible', 'true');
-
     cameraRig.setAttribute('position', '0 0 6');
+
+    //pause briefly
+    await wait(300)
+
+    //Fade back in
+    fadeOverlay.classList.remove('visible');
 })
+

@@ -59,3 +59,17 @@ button:hover{
 .hidden{
   display: none;
 }
+
+.fade-overlay {
+  position: fixed;
+  inset: 0;
+  background: black;
+  z-index: 20; 
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+
+.fade-overlay.visible{
+  opacity: 1;
+}
