@@ -6,9 +6,9 @@ document.querySelector('#app').innerHTML = `
     <div class="overlay-card">
       <h1>Welcome</h1>
       <p>
-        This experience is an immersive visual companion to an original song. 
+        This experience is an immersive visual companion to an original song.
       </p>
-      <button id="startButton>Start Experience</button>
+      <button id="startButton">Start Experience</button>
     </div>
   </div>
 
@@ -21,12 +21,12 @@ document.querySelector('#app').innerHTML = `
 
   <a-scene>
     <a-assets>
-      <audio id="introAudio src="/audio/Intro.mp3" preload="auto"></audio>
+      <audio id="introAudio" src="/audio/Intro.mp3" preload="auto"></audio>
     </a-assets>
 
-    <a-sky id="sky" color="#111111></a-sky>
+    <a-sky id="sky" color="#111111"></a-sky>
 
-    <a-entity id="cameraRig" position=" 0 0 4">
+    <a-entity id="cameraRig" position="0 0 4">
       <a-camera wasd-controls-enabled="true"></a-camera>
     </a-entity>
 
