@@ -9,3 +9,53 @@ html, body, #app {
 canvas {
   display: block;
 }
+
+.overlay{
+  position: fixed;
+  inset: 0;
+  z-index: 10; 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:rgba(0,0,0,0.72);
+
+}
+
+.overlay-card{
+  width: min(90vw, 420px);
+  padding: 28px;
+  border-radius: 16px; 
+  background: #161616;
+  color: white; 
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+
+.overlay-card h1, 
+.overlay-card h2{
+  margin-top: 0;
+}
+
+.overlay-card p{
+  line-height: 1.5;
+  color: #dddddd; 
+}
+
+button{
+  margin-top: 12px; 
+  padding:12px 18px; 
+  border: none; 
+  border-radius: 10px;
+  background: #7c5cff;
+  color: white; 
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:hover{
+  opacity: 0.92;
+}
+
+.hidden{
+  display: none;
+}
