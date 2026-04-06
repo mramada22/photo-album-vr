@@ -99,6 +99,11 @@ const introAudio = document.getElementById('introAudio');
 
 let introHasFinished = false; 
 
+// Pause for `ms` milliseconds
+function wait(ms){
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 startButton.addEventListener('click', async () =>{
     welcomeOverlay.classList.add('hidden');
 
