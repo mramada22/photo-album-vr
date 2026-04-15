@@ -1,6 +1,10 @@
 import 'aframe'
 import './style.css'
 
+const SONG_TARGET_VOLUME = 0.8;
+const FADE_DURATION = 400; // in milliseconds
+let fadeInterval = null;
+
 document.querySelector('#app').innerHTML = `
   <div id="welcomeOverlay" class="overlay">
     <div class="overlay-card">
@@ -119,7 +123,38 @@ function wait(ms){
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function clearFade(){
+  if(fadeInterval){
+    clearInterval(fadeInterval);
+    fadeInterval = null;
+  } 
+};
 
+function fadeOutAudio(audio, startVolume, endVolume, duration){
+  clearFade();
+
+  const stepTime = 25; // ms
+  const steps = Math.max(1, Math.floor(duration / stepTime));
+  const volumeStep = (endVolume - startVolume) / steps;
+ 
+  audio.volume = startVolume;
+
+  return new Promise(resolve => {
+   let currentStep = 0;
+
+   fadeInterval = setInterval(() => {
+     currentStep++;
+     const newVolume = startVolume + volumeStep * currentStep;
+     audio.volume = Math.max(0, Math.min(1, newVolume));
+
+     if(currentStep >= steps){  
+        clearFade();
+        audio.volume = endVolume;
+        resolve();
+     }
+   }, stepTime);
+ })
+}
 
 startButton.addEventListener('click', async () =>{
 
@@ -170,7 +205,9 @@ enterTheaterButton.addEventListener('click', async () =>{
 
     try{
       songAudio.currentTime = 0;
+      songAudio.volume = 0;
       await songAudio.play();
+      await fadeOutAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION);
     } catch (error){
       console.error('Audio has failed to play:', error);
       alert('Song Audio Could not play, check MP3 file.');
@@ -183,22 +220,39 @@ enterTheaterButton.addEventListener('click', async () =>{
 
 playSongButton.addEventListener('click', async () =>{
     try{
-      await songAudio.play();
+      clearFade();
+
+      if(songAudio.paused){
+        songAudio.volume = 0;
+        await songAudio.play();
+        await fadeOutAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION);
+      } else {
+        await fadeOutAudio(songAudio, songAudio.volume, SONG_TARGET_VOLUME, FADE_DURATION);
+      }
+      
     } catch (error){
       console.error('Song has failed to play:', error);
     }
 });
 
-pauseSongButton.addEventListener('click', () =>{
+pauseSongButton.addEventListener('click', async () =>{
+    if(songAudio.paused) return;
+
+    await fadeOutAudio(songAudio, songAudio.volume, 0, FADE_DURATION)
     songAudio.pause();
 });
 
 restartSongButton.addEventListener('click', async () =>{
-    songAudio.pause();
-    songAudio.currentTime = 0;
 
     try{
+      clearFade();
+
+      songAudio.pause();
+      songAudio.currentTime = 0;
+      songAudio.volume = 0;
+
       await songAudio.play();
+      await fadeOutAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION);
     } catch (error){
       console.error('Song failed to restart', error);
     }
