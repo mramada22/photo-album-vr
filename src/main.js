@@ -21,9 +21,20 @@ document.querySelector('#app').innerHTML = `
 
   <div id="fadeOverlay" class="fade-overlay"></div>
 
+
+  <div id="songControlsOverlay" class="controls-overlay hidden">
+    <div class="controls-card">
+      <button id="playSongButton">Play Song</button>
+      <button id="pauseSongButton">Pause Song</button>
+      <button id="restartSongButton">Restart Song</button>
+    </div>
+  </div>
+
+
   <a-scene>
     <a-assets>
       <audio id="introAudio" src="/audio/Intro.mp3" preload="auto"></audio>
+      <audio id="songAudio" src="/audio/song.mp3" preload="auto"></audio>
     </a-assets>
 
     <a-sky id="sky" color="#111111"></a-sky>
@@ -90,13 +101,16 @@ const welcomeOverlay = document.getElementById('welcomeOverlay');
 const theaterButtonOverlay = document.getElementById('theaterButtonOverlay');
 const fadeOverlay = document.getElementById('fadeOverlay');
 
-
-
 const introRoom = document.getElementById('introRoom');
 const theaterRoom = document.getElementById('theaterRoom');
 const cameraRig = document.getElementById('cameraRig');
 
 const introAudio = document.getElementById('introAudio');
+const songControlsOverlay = document.getElementById('songControlsOverlay');
+
+const playSongButton = document.getElementById('playSongButton');
+const pauseSongButton = document.getElementById('pauseSongButton');
+const restartSongButton = document.getElementById('restartSongButton');
 
 let introHasFinished = false; 
 
@@ -133,6 +147,8 @@ introAudio.addEventListener('ended', () =>{
     theaterButtonOverlay.classList.remove('hidden');
 });
 
+
+
 enterTheaterButton.addEventListener('click', async () =>{
     if(!introHasFinished) return;
 
@@ -147,10 +163,43 @@ enterTheaterButton.addEventListener('click', async () =>{
     theaterRoom.setAttribute('visible', 'true');
     cameraRig.setAttribute('position', '0 0 6');
 
+    songControlsOverlay.classList.remove('hidden');
+
     //pause briefly
     await wait(300)
 
+    try{
+      songAudio.currentTime = 0;
+      await songAudio.play();
+    } catch (error){
+      console.error('Audio has failed to play:', error);
+      alert('Song Audio Could not play, check MP3 file.');
+    }
+
+
     //Fade back in
     fadeOverlay.classList.remove('visible');
-})
+});
 
+playSongButton.addEventListener('click', async () =>{
+    try{
+      await songAudio.play();
+    } catch (error){
+      console.error('Song has failed to play:', error);
+    }
+});
+
+pauseSongButton.addEventListener('click', () =>{
+    songAudio.pause();
+});
+
+restartSongButton.addEventListener('click', async () =>{
+    songAudio.pause();
+    songAudio.currentTime = 0;
+
+    try{
+      await songAudio.play();
+    } catch (error){
+      console.error('Song failed to restart', error);
+    }
+});

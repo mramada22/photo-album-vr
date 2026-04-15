@@ -73,3 +73,20 @@ button:hover{
 .fade-overlay.visible{
   opacity: 1;
 }
+
+.controls-overlay{
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 15;
+}
+
+.controls-card{
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(20, 20, 20, 0.9);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
