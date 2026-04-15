@@ -32,7 +32,7 @@ document.querySelector('#app').innerHTML = `
       <a-camera wasd-controls-enabled="true"></a-camera>
     </a-entity>
 
-    <!-- Intro Room -->
+ <!-- Intro Room -->
      <a-entity id="introRoom">
       <a-plane position="0 0 -4" rotation="-90 0 0" width="12" height="12" color="#222222"></a-plane>
       <a-plane position="0 3 -4" rotation="90 0 0" width="12" height="12" color="#1a1a1a"></a-plane>
@@ -62,7 +62,7 @@ document.querySelector('#app').innerHTML = `
       </a-box>
     </a-entity>
 
-    <!-- Theater room -->
+ <!-- Theater room -->
     <a-entity id="theaterRoom" visible="false">
       <a-plane position="0 0 -4" rotation="-90 0 0" width="18" height="18" color="#101010"></a-plane>
       <a-plane position="0 4 -12" width="10" height="5" color="#f2f2f2"></a-plane>
@@ -91,6 +91,7 @@ const theaterButtonOverlay = document.getElementById('theaterButtonOverlay');
 const fadeOverlay = document.getElementById('fadeOverlay');
 
 
+
 const introRoom = document.getElementById('introRoom');
 const theaterRoom = document.getElementById('theaterRoom');
 const cameraRig = document.getElementById('cameraRig');
@@ -104,8 +105,17 @@ function wait(ms){
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+
+
 startButton.addEventListener('click', async () =>{
+
+  //Fade to black
+    fadeOverlay.classList.add('visible');
+    await wait(1000);
+
     welcomeOverlay.classList.add('hidden');
+
+    await wait(300);
 
     try{
       await introAudio.play();
@@ -113,6 +123,9 @@ startButton.addEventListener('click', async () =>{
       console.error('Audio has failed to play:', error);
       alert('Intro Audio Could not play, check MP3 file.');
     }
+
+    //Fade back in
+    fadeOverlay.classList.remove('visible');
 });
 
 introAudio.addEventListener('ended', () =>{
