@@ -1,5 +1,7 @@
 import 'aframe'
 import './style.css'
+import 'aframe'
+import 'aframe-extras'
 
 const SONG_TARGET_VOLUME = 0.8;
 const FADE_DURATION = 400; // in milliseconds
