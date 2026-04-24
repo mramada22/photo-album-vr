@@ -37,7 +37,7 @@ document.querySelector('#app').innerHTML = `
 
   <a-scene>
     <a-assets>
-      <audio id="introAudio" src="/audio/Intro.mp3" preload="auto"></audio>
+      <audio id="introAudio" src="/audio/intro.mp3" preload="auto"></audio>
       <audio id="songAudio" src="/audio/song.mp3" preload="auto"></audio>
     </a-assets>
 
