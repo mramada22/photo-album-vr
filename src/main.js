@@ -46,7 +46,7 @@ document.querySelector('#app').innerHTML = `
     <a-sky id="sky" color="#111111"></a-sky>
 
     <a-entity id="cameraRig" position="0 0 4">
-      <a-camera wasd-controls-enabled="true"></a-camera>
+      <a-camera id="camera" wasd-controls-enabled="true" look-controls="enabled: false"></a-camera>
     </a-entity>
 
  <!-- Intro Room -->
@@ -206,8 +206,13 @@ async function playApproachClip() {
 
   albumIntroSpace.setAttribute('visible', 'true')
 
-  cameraRig.setAttribute('position', '0 2.8 6.5')
-  setCameraRotation(-28, 0, 0)
+  cameraRig.setAttribute('position', '0 6 6.5')
+  cameraRig.setAttribute('rotation', '0 0 0')
+  const camera = cameraRig.querySelector('#camera')
+  if (camera) {
+    camera.setAttribute('rotation', '0 0 0')
+    animateCameraLookTo('-80 0 0', 900, 'easeOutQuad')
+  }
 
   await waitForModel(approachAlbumEntity)
 
@@ -219,14 +224,13 @@ async function playApproachClip() {
     'clip: *; loop: once; clampWhenFinished: true; timeScale: 1'
   )
 
-  await wait(40)
-  setCameraRotation(0, 0, 0)
-  animateCameraRigTo('0 6 -4', 4200, 'easeInOutQuad')
-  animateCameraRigRotationTo('-90 0 0', 4200, 'easeInOutQuad')
+  await wait(1200)
+  animateCameraRigTo('0 3.2 -4.5', 4200, 'easeInOutQuad')
 
   await wait(4500)
-  animateCameraRigTo('0 3.2 -4.5', 2600, 'easeInOutQuad')
-  animateCameraRigRotationTo('-90 0 0', 2600, 'easeInOutQuad')
+  animateCameraRigTo('0 0.8 -4.1', 2600, 'easeInOutQuad')
+  await wait(2600)
+  animateCameraLookTo('-90 0 0', 1200, 'easeInOutQuad')
 }
 
 async function holdOnTitlePage() {
