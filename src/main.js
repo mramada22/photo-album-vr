@@ -90,16 +90,19 @@ document.querySelector('#app').innerHTML = `
         <a-light type="ambient" intensity="0.55"></a-light>
         <a-light type="spot" position="0 4 -2" rotation="-90 0 0" intensity="1.2" angle="30"></a-light>
 
-    <a-entity
-        id="approachAlbumEntity"
-        gltf-model="#approachAlbumModel"
-        position="0 1.4 -4"
-        rotation="0 0 0"
-        scale="1 1 1">
+        <a-entity id="approachAlbumAnchor" position="0 1.4 -4">
+          <a-entity
+              id="approachAlbumEntity"
+              gltf-model="#approachAlbumModel"
+              position="0 0.6 -1.5"
+              rotation="0 0 0"
+              scale="1 1 1">
+          </a-entity>
+        </a-entity>
+
+      </a-entity>
     </a-entity>
 
-
-    </a-entity>
 
     <!-- ===== MEMORY ROOM ===== -->
     <a-entity id="memoryRoom" visible="false">
@@ -151,6 +154,13 @@ const restartSongButton = document.getElementById('restartSongButton');
 
 const albumIntroSpace = document.getElementById('albumIntroSpace')
 const approachAlbumEntity = document.getElementById('approachAlbumEntity')
+
+const memoryRoom          = document.getElementById('memoryRoom')
+const memoryAmbient       = document.getElementById('memoryAmbient')
+const memorySpot          = document.getElementById('memorySpot')
+const polaroidContainer   = document.getElementById('polaroidContainer')
+const pictureFrameGroup   = document.getElementById('pictureFrameGroup')
+const memoryVideo         = document.getElementById('memoryVideo')
 
 let introHasFinished = false; 
 
@@ -236,13 +246,9 @@ async function playApproachClip() {
 
   albumIntroSpace.setAttribute('visible', 'true')
 
-  cameraRig.setAttribute('position', '0 6 6.5')
-  cameraRig.setAttribute('rotation', '0 0 0')
-  const camera = cameraRig.querySelector('#camera')
-  if (camera) {
-    camera.setAttribute('rotation', '0 0 0')
-    animateCameraLookTo('-80 0 0', 900, 'easeOutQuad')
-  }
+  // Start the camera at eye level, directly behind the album — no pre-tilt
+  cameraRig.setAttribute('position', '0 2.2 6.5')
+  setCameraRotation(0, 0, 0)
 
   await waitForModel(approachAlbumEntity)
 
@@ -254,13 +260,20 @@ async function playApproachClip() {
     'clip: *; loop: once; clampWhenFinished: true; timeScale: 1'
   )
 
-  await wait(1200)
-  animateCameraRigTo('0 3.2 -4.5', 4200, 'easeInOutQuad')
+  await wait(40)
 
-  await wait(4500)
-  animateCameraRigTo('0 0.8 -4.1', 2600, 'easeInOutQuad')
-  await wait(2600)
-  animateCameraLookTo('-90 0 0', 1200, 'easeInOutQuad')
+  // Phase 1 — push in AND tilt down simultaneously, arriving at birds-eye hover
+  // Both animations share the same duration so they finish together
+  animateCameraRigTo('0 5.5 -4', 4800, 'easeInOutQuad')
+  animateCameraRigRotationTo('-90 0 0', 4800, 'easeInOutQuad')
+
+  await wait(4900)
+
+  // Phase 2 — slow creep downward, getting closer to the page surface
+  animateCameraRigTo('0 3.0 -4', 2800, 'easeInQuad')
+  // Rig rotation stays at -90 (straight down) — no need to re-set it
+
+  await wait(2900)
 }
 
 async function holdOnTitlePage() {
@@ -268,21 +281,33 @@ async function holdOnTitlePage() {
   animateCameraLookTo('-82 0 0', 1200, 'easeOutQuad')
 }
 
-async function enterPageWorldPlaceholder() {
+async function transitionToMemoryRoom() {
+  // Camera tilts downward as if being pulled into the album page
   animateCameraRigTo('0 1.1 1.2', 1200, 'easeInQuad')
   animateCameraLookTo('-88 0 0', 1200, 'easeInQuad')
-
   await wait(900)
 
+  // Fade screen to black
   fadeOverlay.classList.add('visible')
-  await wait(900)
+  await wait(1000)
 
+  // Hide everything from the theater, show the memory room
   albumIntroSpace.setAttribute('visible', 'false')
+  theaterRoom.setAttribute('visible', 'false')
+  memoryRoom.setAttribute('visible', 'true')
 
-  cameraRig.setAttribute('position', '0 0 4')
+  // Drop the camera inside the room, facing the back wall
+  cameraRig.setAttribute('position', '0 1.6 -2')
+  cameraRig.setAttribute('rotation', '0 0 0')
   setCameraRotation(0, 0, 0)
 
+  // Small delay so the scene swap settles before we fade back in
+  await wait(100)
+
+  // Fade back in
   fadeOverlay.classList.remove('visible')
+  // Begin the song-timed animation sequence
+  startMemoryRoomSequence()
 }
 //**Song Playback Functions */
 
@@ -321,6 +346,144 @@ function fadeOutAudio(audio, startVolume, endVolume, duration){
    }, stepTime);
  })
 };
+
+// ─── Song Cue System ────────────────────────────────────────────────
+// Each entry fires once when songAudio.currentTime passes the 'time' value.
+// Adjust the time values (in seconds) to match your actual song structure.
+
+const SONG_CUES = [
+  { time: 2,   fn: spawnPolaroids },       // Verse 1 starts
+  { time: 35,  fn: triggerPageTurn },      // Pre-chorus
+  { time: 55,  fn: warmRoomUp },           // Chorus: room brightens
+  { time: 90,  fn: showCameraFrame },      // Verse 2: frame appears on wall
+  { time: 120, fn: showVideoFrames },      // Bridge: video frame appears
+  { time: 145, fn: fullWarmth },           // Final chorus: full brightness
+]
+
+let firedCues = new Set()   // tracks which cues have already fired
+let cueListener = null      // reference so we can remove the listener on restart
+
+function startMemoryRoomSequence() {
+  firedCues.clear()
+  // Remove any old listener from a previous playthrough
+  if (cueListener) songAudio.removeEventListener('timeupdate', cueListener)
+
+  cueListener = () => {
+    const t = songAudio.currentTime
+    SONG_CUES.forEach((cue, i) => {
+      if (t >= cue.time && !firedCues.has(i)) {
+        firedCues.add(i)
+        cue.fn()           // fire the animation function
+      }
+    })
+  }
+  songAudio.addEventListener('timeupdate', cueListener)
+};
+
+// ─── Memory Room Animations ─────────────────────────────────────────
+
+function spawnPolaroids() {
+  // Positions and rotations for 6 floating polaroids around the room
+  const polaroids = [
+    { pos: '-2 1.8 -5',   rot: '0 10 -8'  },
+    { pos: '-0.5 2.2 -6', rot: '0 -5 12'  },
+    { pos: '1.5 1.5 -5.5',rot: '0 -15 5'  },
+    { pos: '2.2 2 -7',    rot: '0 20 -10' },
+    { pos: '-1.8 1.4 -7', rot: '0 8 15'   },
+    { pos: '0.3 2.5 -8',  rot: '0 -12 -6' },
+  ]
+
+  polaroids.forEach(({ pos, rot }, i) => {
+    setTimeout(() => {
+      // The outer entity positions the polaroid in space
+      const entity = document.createElement('a-entity')
+      entity.setAttribute('position', pos)
+      entity.setAttribute('rotation', rot)
+
+      // White card (the polaroid itself)
+      const card = document.createElement('a-box')
+      card.setAttribute('width', '0.55')
+      card.setAttribute('height', '0.66')
+      card.setAttribute('depth', '0.01')
+      card.setAttribute('color', '#f5f0e8')
+      // Animates upward from slightly below its final position with a bounce
+      card.setAttribute('animation', [
+        'property: position;',
+        'from: 0 -0.4 0;',
+        'to: 0 0 0;',
+        'dur: 900;',
+        'easing: easeOutBack'
+      ].join(' '))
+
+      entity.appendChild(card)
+      polaroidContainer.appendChild(entity)
+    }, i * 700) // each polaroid appears 700ms after the last
+  })
+}
+
+function triggerPageTurn() {
+  // Dims the ambient light slightly — room feels more introspective
+  // You'll replace this later with a Blender page-turn GLB animation
+  let intensity = 0.3
+  const target = 0.15
+  const interval = setInterval(() => {
+    intensity = Math.max(target, intensity - 0.008)
+    memoryAmbient.setAttribute('light', `type: ambient; intensity: ${intensity}; color: #ffcc88`)
+    if (intensity <= target) clearInterval(interval)
+  }, 40)
+}
+
+function warmRoomUp() {
+  // Gradually brightens the room for the chorus
+  let intensity = parseFloat(memoryAmbient.getAttribute('light').intensity) || 0.3
+  const target = 0.75
+  const interval = setInterval(() => {
+    intensity = Math.min(target, intensity + 0.008)
+    memoryAmbient.setAttribute('light', `type: ambient; intensity: ${intensity}; color: #ffcc88`)
+    memorySpot.setAttribute('light', `type: point; intensity: ${Math.min(1.2, intensity * 1.5)}; color: #ffaa44; distance: 10`)
+    if (intensity >= target) clearInterval(interval)
+  }, 40)
+}
+
+function showCameraFrame() {
+  // Makes a picture frame appear on the back wall
+  // Later you'll swap this entity for a Blender model of an actual frame
+  const frame = document.createElement('a-entity')
+  frame.setAttribute('position', '-2.5 1.8 -8')
+  frame.setAttribute('rotation', '0 15 0')
+
+  const border = document.createElement('a-box')
+  border.setAttribute('width', '1')
+  border.setAttribute('height', '0.8')
+  border.setAttribute('depth', '0.05')
+  border.setAttribute('color', '#3b2410')
+  border.setAttribute('animation', 'property: scale; from: 0 0 0; to: 1 1 1; dur: 1000; easing: easeOutElastic')
+
+  frame.appendChild(border)
+  memoryRoom.appendChild(frame)
+}
+
+function showVideoFrames() {
+  // Reveals the large video frame on the back wall and starts playback
+  pictureFrameGroup.setAttribute('visible', 'true')
+  pictureFrameGroup.setAttribute('animation', [
+    'property: scale;',
+    'from: 0 0 0;',
+    'to: 1 1 1;',
+    'dur: 1200;',
+    'easing: easeOutBack'
+  ].join(' '))
+  // Start playing the video
+  if (memoryVideo) {
+    memoryVideo.play().catch(err => console.warn('Video autoplay blocked:', err))
+  }
+}
+
+function fullWarmth() {
+  // Final chorus — push lights to their warmest, brightest state
+  memoryAmbient.setAttribute('light', 'type: ambient; intensity: 1; color: #ffddaa')
+  memorySpot.setAttribute('light',    'type: point;   intensity: 2; color: #ffbb55; distance: 14')
+}
 
 startButton.addEventListener('click', async () =>{
 
@@ -377,15 +540,16 @@ enterTheaterButton.addEventListener('click', async () => {
   } catch (error) {
     console.error('Song failed to play:', error)
     alert('The song could not play. Check that /public/audio/song.mp3 exists.')
-  }
+  };
 
-  // Play Blender approach animation
+// Play Blender approach animation, then transition into the memory room
   try {
     await playApproachClip()
+    await transitionToMemoryRoom()
   } catch (error) {
-    console.error('Approach clip failed to play:', error)
+    console.error('Approach clip or transition failed:', error)
   }
-})
+});
 
 playSongButton.addEventListener('click', async () =>{
     try{
@@ -421,8 +585,8 @@ restartSongButton.addEventListener('click', async () => {
 
     await songAudio.play()
     await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
-
     await playApproachClip()
+    await transitionToMemoryRoom()
   } catch (error) {
     console.error('Song failed to restart:', error)
   }
