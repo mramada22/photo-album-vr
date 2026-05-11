@@ -41,6 +41,7 @@ document.querySelector('#app').innerHTML = `
       <a-asset-item id="approachAlbumModel" src="/models/approach_album.glb"></a-asset-item>
       <audio id="introAudio" src="/audio/intro.mp3" preload="auto"></audio>
       <audio id="songAudio" src="/audio/song.mp3" preload="auto"></audio>
+      <video id="memoryVideo" src="/video/memory.mp4" preload="auto" loop crossorigin="anonymous"></video>
     </a-assets>
 
     <a-sky id="sky" color="#111111"></a-sky>
@@ -95,6 +96,35 @@ document.querySelector('#app').innerHTML = `
         position="0 1.4 -4"
         rotation="0 0 0"
         scale="1 1 1">
+    </a-entity>
+
+
+    </a-entity>
+
+    <!-- ===== MEMORY ROOM ===== -->
+    <a-entity id="memoryRoom" visible="false">
+
+      <!-- The floor, ceiling, and 3 walls that box you in -->
+      <a-plane position="0 0 -4"  rotation="-90 0 0" width="14" height="14" color="#5c3d1e"></a-plane>
+      <a-plane position="0 3 -4"  rotation="90 0 0"  width="14" height="14" color="#2a1a0e"></a-plane>
+      <a-plane position="0 1.5 -11" width="14" height="6" color="#3b2410"></a-plane>
+      <a-plane position="-7 1.5 -4" rotation="0 90 0"  width="14" height="6" color="#3b2410"></a-plane>
+      <a-plane position="7 1.5 -4"  rotation="0 -90 0" width="14" height="6" color="#3b2410"></a-plane>
+
+      <!-- Warm amber lighting — starts dim, will brighten during chorus -->
+      <a-light id="memoryAmbient" type="ambient" intensity="0.3" color="#ffcc88"></a-light>
+      <a-light id="memorySpot"    type="point"   intensity="0.5" color="#ffaa44"
+               position="0 2.8 -4" distance="10"></a-light>
+
+      <!-- Empty container — polaroids will be created here by JS -->
+      <a-entity id="polaroidContainer"></a-entity>
+
+      <!-- Picture frame with video — hidden until the bridge section -->
+      <a-entity id="pictureFrameGroup" position="0 1.6 -9" visible="false">
+        <a-box width="2.4" height="1.8" depth="0.05" color="#3b2410"></a-box>
+        <a-video src="#memoryVideo" width="2" height="1.4" position="0 0 0.04"></a-video>
+      </a-entity>
+
     </a-entity>
 
   </a-scene>
