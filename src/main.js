@@ -1,11 +1,9 @@
+// src/main.js
 import 'aframe'
 import 'aframe-extras'
 import './style.css'
 
-const SONG_TARGET_VOLUME = 0.8;
-const FADE_DURATION = 400; // in milliseconds
-let fadeInterval = null;
-
+// ─── Inject HTML first before any element references ─────────────────
 document.querySelector('#app').innerHTML = `
   <div id="welcomeOverlay" class="overlay">
     <div class="overlay-card">
@@ -26,6 +24,11 @@ document.querySelector('#app').innerHTML = `
 
   <div id="fadeOverlay" class="fade-overlay"></div>
 
+  <div id="skipIntroBtn" style="position: fixed; top: 16px; right: 16px; z-index: 999;">
+    <button onclick="document.getElementById('skipIntroBtn').style.display='none'" 
+            id="skipTrigger">Skip Intro (dev)</button>
+  </div>
+  
 
   <div id="songControlsOverlay" class="controls-overlay hidden">
     <div class="controls-card">
@@ -35,12 +38,12 @@ document.querySelector('#app').innerHTML = `
     </div>
   </div>
 
-
   <a-scene>
     <a-assets>
       <a-asset-item id="approachAlbumModel" src="/models/approach_album.glb"></a-asset-item>
       <audio id="introAudio" src="/audio/intro.mp3" preload="auto"></audio>
       <audio id="songAudio" src="/audio/song.mp3" preload="auto"></audio>
+        <img id="prayingHands" src="/images/praying_hands.png" crossorigin="anonymous">
     </a-assets>
 
     <a-sky id="sky" color="#111111"></a-sky>
@@ -49,8 +52,8 @@ document.querySelector('#app').innerHTML = `
       <a-camera id="camera" wasd-controls="enabled: false" look-controls="enabled: true"></a-camera>
     </a-entity>
 
- <!-- Intro Room -->
-     <a-entity id="introRoom">
+    <!-- Intro Room -->
+    <a-entity id="introRoom">
       <a-plane position="0 0 -4" rotation="-90 0 0" width="12" height="12" color="#222222"></a-plane>
       <a-plane position="0 3 -4" rotation="90 0 0" width="12" height="12" color="#1a1a1a"></a-plane>
       <a-plane position="0 1.5 -10" width="12" height="6" color="#191919"></a-plane>
@@ -79,8 +82,7 @@ document.querySelector('#app').innerHTML = `
       </a-box>
     </a-entity>
 
- <!-- Theater room -->
-
+    <!-- Theater Room -->
     <a-entity id="theaterRoom" visible="false">
       <a-plane position="0 0 -4" rotation="-90 0 0" width="18" height="18" color="#090909"></a-plane>
       <a-light type="ambient" intensity="0.25"></a-light>
@@ -91,21 +93,21 @@ document.querySelector('#app').innerHTML = `
 
         <a-entity id="approachAlbumAnchor" position="0 1.4 -4">
           <a-entity
-              id="approachAlbumEntity"
-              gltf-model="#approachAlbumModel"
-              position="0 0.6 -1.5"
-              rotation="0 0 0"
-              scale="1 1 1">
+            id="approachAlbumEntity"
+            gltf-model="#approachAlbumModel"
+            position="0 0.6 -1.5"
+            rotation="0 0 0"
+            scale="1 1 1">
           </a-entity>
         </a-entity>
 
       </a-entity>
     </a-entity>
 
-
     <!-- ===== MEMORY ROOM ===== -->
     <a-entity id="memoryRoom" visible="false">
-      <!-- Space backdrop — large sphere surrounding the camera -->
+
+      <!-- Space backdrop -->
       <a-sphere
         id="spaceSphere"
         radius="80"
@@ -113,22 +115,31 @@ document.querySelector('#app').innerHTML = `
         side="back">
       </a-sphere>
 
-      <!-- Star field — 3 layers at different depths for parallax feel -->
+      <!-- Star field layers -->
       <a-entity id="starLayer1"></a-entity>
       <a-entity id="starLayer2"></a-entity>
       <a-entity id="starLayer3"></a-entity>
 
-      <!-- Central pulsing star -->
-      <a-sphere
-        id="centralStar"
-        position="0 1.6 -15"
-        radius="0.3"
-        color="#ffffff"
-        visible="false"
-        material="color: #ffffff; emissive: #ffffff; emissiveIntensity: 1">
-      </a-sphere>
+      <!-- Central Pulsing star -->
+        <a-sphere
+          id="centralStar"
+          position="0 1.6 -15"
+          radius="0.3"
+          color="#ffffff"
+          visible="false"
+          material="color: #ffffff; emissive: #ffffff; emissiveIntensity: 1">
 
-      <!-- Shooting star — starts offscreen, animates across -->
+          <!-- Image sits just in front of the sphere surface, inherits all parent animations -->
+          <a-circle
+            id="starImage"
+            position="0 0 0.31"
+            radius="0.28"
+            visible="false"
+            material="src: #prayingHands; shader: flat; side: double; transparent: true">
+          </a-circle>
+        </a-sphere>
+
+      <!-- Shooting star -->
       <a-sphere
         id="shootingStar"
         position="-30 12 -20"
@@ -137,631 +148,217 @@ document.querySelector('#app').innerHTML = `
         material="color: #ffffff; emissive: #ffffaa; emissiveIntensity: 1.5">
       </a-sphere>
 
-      <!-- Trail container — dots spawned by JS behind the shooting star -->
+      <!-- Trail and burst containers -->
       <a-entity id="starTrail"></a-entity>
-
-      <!-- Burst particles — spawned by JS on explosion -->
       <a-entity id="burstContainer"></a-entity>
 
-  
+      <!-- Planet for "give her the world" -->
+      <a-sphere
+        id="worldPlanet"
+        position="0 -8 -15"
+        radius="1.2"
+        visible="false"
+        material="color: #1a6b3c; emissive: #0a3d8f; emissiveIntensity: 0.8; transparent: true; opacity: 1">
+      </a-sphere>
+
+      <!-- Floating text container -->
+      <a-entity id="floatingTextContainer"></a-entity>
+
+      <!-- Constellation path container -->
+      <a-entity id="constellationContainer"></a-entity>
+
+    </a-entity>
+
+        <!-- ===== PRE-CHORUS ROOM ===== -->
+    <a-entity id="preChorusRoom" visible="false">
+
+      <!-- Placeholder dark environment — swap for your BlenderKit room later -->
+      <a-sphere
+        id="preChorusSphere"
+        radius="80"
+        color="#0a0010"
+        side="back">
+      </a-sphere>
+
+      <a-light type="ambient" intensity="0.2" color="#8844ff"></a-light>
 
     </a-entity>
 
   </a-scene>
 `
+// ─── Imports that touch the DOM come after innerHTML is set ──────────
+async function init() {
+  const { getElements } = await import('./elements.js')
+  const {
+    startButton, enterTheaterButton, welcomeOverlay, theaterButtonOverlay,
+    fadeOverlay, songControlsOverlay, playSongButton, pauseSongButton,
+    restartSongButton, introRoom, cameraRig
+  } = getElements()
 
-const startButton = document.getElementById('startButton');
-const enterTheaterButton = document.getElementById('enterTheaterButton');
+  const { fadeAudio, fadeOutAudio, clearFade,
+    SONG_TARGET_VOLUME, FADE_DURATION } = await import('./scene/audio.js')
 
-const welcomeOverlay = document.getElementById('welcomeOverlay');
-const theaterButtonOverlay = document.getElementById('theaterButtonOverlay');
-const fadeOverlay = document.getElementById('fadeOverlay');
+  // Single import for all transition functions
+  const { playApproachClip, transitionToMemoryRoom, transitionToPreChorus } = await import('./scene/transitions.js')
+  const { startMemoryRoomSequence } = await import('./cues.js')
 
-const introRoom = document.getElementById('introRoom');
-const theaterRoom = document.getElementById('theaterRoom');
-const cameraRig = document.getElementById('cameraRig');
+  const introAudio = document.getElementById('introAudio')
+  const songAudio  = document.getElementById('songAudio')
+  const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+  let introHasFinished = false
 
-const introAudio = document.getElementById('introAudio');
-const songAudio = document.getElementById('songAudio');
-const songControlsOverlay = document.getElementById('songControlsOverlay');
+  // Pre-chorus check — NOT added here, only added when the space scene starts
+  let preChorusFired = false
+  let preChorusCheck = null
 
-const playSongButton = document.getElementById('playSongButton');
-const pauseSongButton = document.getElementById('pauseSongButton');
-const restartSongButton = document.getElementById('restartSongButton');
-
-const albumIntroSpace = document.getElementById('albumIntroSpace')
-const approachAlbumEntity = document.getElementById('approachAlbumEntity')
-
-const memoryRoom          = document.getElementById('memoryRoom')
-const centralStar         = document.getElementById('centralStar')
-const shootingStar        = document.getElementById('shootingStar')
-const starTrail           = document.getElementById('starTrail')
-const burstContainer      = document.getElementById('burstContainer')
-const starLayer1          = document.getElementById('starLayer1')
-const starLayer2          = document.getElementById('starLayer2')
-const starLayer3          = document.getElementById('starLayer3')
-
-let introHasFinished = false; 
-
-const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms))
-
-function waitForModel(entity, timeout = 10000) {
-  if (!entity) {
-    return Promise.reject(new Error('Entity is not defined'))
-  }
-
-  return new Promise((resolve, reject) => {
-    const alreadyLoaded = entity.getObject3D('mesh')
-    if (alreadyLoaded) {
-      resolve()
-      return
+  function attachPreChorusListener() {
+    preChorusFired = false
+    if (preChorusCheck) songAudio.removeEventListener('timeupdate', preChorusCheck)
+    preChorusCheck = () => {
+      if (!preChorusFired && songAudio.currentTime >= 34) {
+        preChorusFired = true
+        songAudio.removeEventListener('timeupdate', preChorusCheck)
+        transitionToPreChorus()
+      }
     }
-
-    const timeoutId = setTimeout(() => {
-      entity.removeEventListener('model-loaded', onModelLoaded)
-      reject(new Error('Timed out waiting for model to load'))
-    }, timeout)
-
-    function onModelLoaded() {
-      clearTimeout(timeoutId)
-      entity.removeEventListener('model-loaded', onModelLoaded)
-      resolve()
-    }
-
-    entity.addEventListener('model-loaded', onModelLoaded)
-  })
-}
-
-function fadeAudio(audio, startVolume, endVolume, duration) {
-  return fadeOutAudio(audio, startVolume, endVolume, duration)
-}
-
-function setCameraRotation(x = 0, y = 0, z = 0) {
-  const camera = cameraRig.querySelector('a-camera')
-  if (!camera) return
-  camera.setAttribute('rotation', `${x} ${y} ${z}`)
-}
-
-function animateCameraRigTo(position, duration = 3000, easing = 'easeInOutQuad') {
-  cameraRig.removeAttribute('animation__move')
-
-  cameraRig.setAttribute('animation__move', {
-    property: 'position',
-    to: position,
-    dur: duration,
-    easing
-  })
-}
-
-function animateCameraRigRotationTo(rotation, duration = 3000, easing = 'easeInOutQuad') {
-  cameraRig.removeAttribute('animation__rotate')
-
-  cameraRig.setAttribute('animation__rotate', {
-    property: 'rotation',
-    to: rotation,
-    dur: duration,
-    easing
-  })
-}
-
-function animateCameraLookTo(rotation, duration = 3000, easing = 'easeInOutQuad') {
-  const camera = cameraRig.querySelector('a-camera')
-  if (!camera) return
-
-  camera.removeAttribute('animation__look')
-
-  camera.setAttribute('animation__look', {
-    property: 'rotation',
-    to: rotation,
-    dur: duration,
-    easing
-  })
-}
-
-async function playApproachClip() {
-  if (theaterRoom && theaterRoom.getAttribute('visible') !== true && theaterRoom.getAttribute('visible') !== 'true') {
-    theaterRoom.setAttribute('visible', 'true')
+    songAudio.addEventListener('timeupdate', preChorusCheck)
   }
+ // ─── Event Listeners ────────────────────────────────────────────────
 
-  albumIntroSpace.setAttribute('visible', 'true')
+    startButton.addEventListener('click', async () => {
+      fadeOverlay.classList.add('visible')
+      await wait(1000)
+      welcomeOverlay.classList.add('hidden')
+      await wait(300)
+      try {
+        await introAudio.play()
+      } catch (error) {
+        console.error('Audio has failed to play:', error)
+        alert('Intro Audio could not play, check MP3 file.')
+      }
+      fadeOverlay.classList.remove('visible')
+    })
 
-  // Start the camera at eye level, directly behind the album — no pre-tilt
-  cameraRig.setAttribute('position', '0 2.2 6.5')
-  setCameraRotation(0, 0, 0)
+    introAudio.addEventListener('ended', () => {
+      introHasFinished = true
+      theaterButtonOverlay.classList.remove('hidden')
+    })
 
-  await waitForModel(approachAlbumEntity)
+    enterTheaterButton.addEventListener('click', async () => {
+      if (!introHasFinished) return
 
-  approachAlbumEntity.removeAttribute('animation-mixer')
-  await wait(50)
+      theaterButtonOverlay.classList.add('hidden')
+      fadeOverlay.classList.add('visible')
+      await wait(1000)
 
-  approachAlbumEntity.setAttribute(
-    'animation-mixer',
-    'clip: *; loop: once; clampWhenFinished: true; timeScale: 1'
-  )
+      introRoom.setAttribute('visible', 'false')
+      cameraRig.setAttribute('position', '0 0 6')
+      songControlsOverlay.classList.remove('hidden')
 
-  await wait(40)
+      await wait(300)
+      fadeOverlay.classList.remove('visible')
 
-  // Phase 1 — push in AND tilt down simultaneously, arriving at birds-eye hover
-  // Both animations share the same duration so they finish together
-  animateCameraRigTo('0 5.5 -4', 4800, 'easeInOutQuad')
-  animateCameraRigRotationTo('-90 0 0', 4800, 'easeInOutQuad')
+      try {
+        songAudio.currentTime = 0
+        songAudio.volume = 0
+        await songAudio.play()
+        await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
+      } catch (error) {
+        console.error('Song failed to play:', error)
+        alert('The song could not play. Check that /public/audio/song.mp3 exists.')
+      }
 
-  await wait(4900)
+      try {
+        await playApproachClip()
+        await transitionToMemoryRoom(startMemoryRoomSequence)
+         attachPreChorusListener() // only start watching after space scene is active
+      } catch (error) {
+        console.error('Approach clip or transition failed:', error)
+      }
+    })
 
-  // Phase 2 — slow creep downward, getting closer to the page surface
-  animateCameraRigTo('0 3.0 -4', 2800, 'easeInQuad')
-  // Rig rotation stays at -90 (straight down) — no need to re-set it
+    playSongButton.addEventListener('click', async () => {
+      try {
+        clearFade()
+        if (songAudio.paused) {
+          songAudio.volume = 0
+          await songAudio.play()
+          await fadeOutAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
+        } else {
+          await fadeOutAudio(songAudio, songAudio.volume, SONG_TARGET_VOLUME, FADE_DURATION)
+        }
+      } catch (error) {
+        console.error('Song has failed to play:', error)
+      }
+    })
 
-  await wait(2900)
-}
+    pauseSongButton.addEventListener('click', async () => {
+      if (songAudio.paused) return
+      await fadeOutAudio(songAudio, songAudio.volume, 0, FADE_DURATION)
+      songAudio.pause()
+    })
 
-async function holdOnTitlePage() {
-  animateCameraRigTo('0 1.8 2.5', 1200, 'easeOutQuad')
-  animateCameraLookTo('-82 0 0', 1200, 'easeOutQuad')
-}
+    restartSongButton.addEventListener('click', async () => {
+        try {
+          clearFade()
+          songAudio.pause()
+          songAudio.currentTime = 0
+          songAudio.volume = 0
+          
+        await songAudio.play()
+        await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
+        await playApproachClip()
+        await transitionToMemoryRoom(startMemoryRoomSequence)
+        attachPreChorusListener() // reset and reattach on restart
+      } catch (error) {
+        console.error('Song failed to restart:', error)
+      }
+    })
 
-async function transitionToMemoryRoom() {
-  // Camera tilts downward as if being pulled into the album page
-  animateCameraRigTo('0 1.1 1.2', 1200, 'easeInQuad')
-  animateCameraLookTo('-88 0 0', 1200, 'easeInQuad')
-  await wait(900)
+    document.getElementById('skipTrigger').addEventListener('click', async () => {
+      document.getElementById('skipIntroBtn').style.display = 'none'
 
-  // Fade screen to black
-  fadeOverlay.classList.add('visible')
-  await wait(1000)
+      // Stop intro audio
+      introAudio.pause()
+      introAudio.currentTime = 0
 
-  // Hide everything from the theater, show the memory room
-  albumIntroSpace.setAttribute('visible', 'false')
-  theaterRoom.setAttribute('visible', 'false')
-  memoryRoom.setAttribute('visible', 'true')
+      // Hide overlays
+      welcomeOverlay.classList.add('hidden')
+      theaterButtonOverlay.classList.add('hidden')
+      songControlsOverlay.classList.remove('hidden')
+      introHasFinished = true
 
-  // Drop the camera inside the room, facing the back wall
-  cameraRig.setAttribute('position', '-16 1.6 6')
-  cameraRig.setAttribute('rotation', '0 0 0')
-  setCameraRotation(0, 0, 0)
+      // Fade to black
+      fadeOverlay.classList.add('visible')
+      await wait(1000)
 
-  // Small delay so the scene swap settles before we fade back in
-  await wait(100)
+      // Set up the theater room exactly like enterTheaterButton does
+      introRoom.setAttribute('visible', 'false')
+      cameraRig.setAttribute('position', '0 0 6')
 
-  // Fade back in
-  fadeOverlay.classList.remove('visible')
-  // Begin the song-timed animation sequence
-  startMemoryRoomSequence()
-}
-//**Song Playback Functions */
+      await wait(300)
+      fadeOverlay.classList.remove('visible')
 
+      // Start song
+      try {
+        songAudio.currentTime = 0
+        songAudio.volume = 0
+        await songAudio.play()
+        await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
+      } catch (error) {
+        console.error('Song failed to play:', error)
+      }
 
-
-function clearFade(){
-
-  if(fadeInterval){
-    clearInterval(fadeInterval);
-    fadeInterval = null;
-  } 
-};
-
-function fadeOutAudio(audio, startVolume, endVolume, duration){
-  clearFade();
-
-  const stepTime = 25; // ms
-  const steps = Math.max(1, Math.floor(duration / stepTime));
-  const volumeStep = (endVolume - startVolume) / steps;
- 
-  audio.volume = startVolume;
-
-  return new Promise(resolve => {
-   let currentStep = 0;
-
-   fadeInterval = setInterval(() => {
-     currentStep++;
-     const newVolume = startVolume + volumeStep * currentStep;
-     audio.volume = Math.max(0, Math.min(1, newVolume));
-
-     if(currentStep >= steps){  
-        clearFade();
-        audio.volume = endVolume;
-        resolve();
-     }
-   }, stepTime);
- })
-};
-
-// ─── Song Cue System ────────────────────────────────────────────────
-// Each entry fires once when songAudio.currentTime passes the 'time' value.
-const SONG_CUES = [
-  { time: 0,  fn: startCentralStar },
-  { time: 8,  fn: fireShootingStar },
-  { time: 18, fn: bloomCentralStar },
-]
-
-let firedCues = new Set()   // tracks which cues have already fired
-let cueListener = null      // reference so we can remove the listener on restart
-
-function startMemoryRoomSequence() {
-  firedCues.clear()
-  if (cueListener) songAudio.removeEventListener('timeupdate', cueListener)
-
-  // Build the star field immediately when the room appears
-  buildStarField()
-
-  cueListener = () => {
-    const t = songAudio.currentTime
-    SONG_CUES.forEach((cue, i) => {
-      if (t >= cue.time && !firedCues.has(i)) {
-        firedCues.add(i)
-        cue.fn()
+    // Run the full approach clip then transition
+      try {
+        await playApproachClip()
+        await transitionToMemoryRoom(startMemoryRoomSequence)
+        attachPreChorusListener()
+      } catch (error) {
+        console.error('Skip intro transition failed:', error)
       }
     })
   }
-  songAudio.addEventListener('timeupdate', cueListener)
-}
 
-// ─── Space Environment Setup ────────────────────────────────────────
+  init()
 
-function buildStarField() {
-  // Creates 3 layers of stars at different distances for depth
-  const layers = [
-    { container: starLayer1, count: 80,  minDist: 30, maxDist: 50, size: 0.08 },
-    { container: starLayer2, count: 120, minDist: 50, maxDist: 65, size: 0.05 },
-    { container: starLayer3, count: 60,  minDist: 20, maxDist: 35, size: 0.12 },
-  ]
-
-  layers.forEach(({ container, count, minDist, maxDist, size }) => {
-    for (let i = 0; i < count; i++) {
-      // Random point on a sphere surface using spherical coordinates
-      const theta = Math.random() * Math.PI * 2
-      const phi   = Math.acos(2 * Math.random() - 1)
-      const dist  = minDist + Math.random() * (maxDist - minDist)
-
-      const x = dist * Math.sin(phi) * Math.cos(theta)
-      const y = dist * Math.sin(phi) * Math.sin(theta)
-      const z = dist * Math.cos(phi)
-
-      const star = document.createElement('a-sphere')
-      star.setAttribute('position', `${x} ${y} ${z}`)
-      star.setAttribute('radius', size + Math.random() * 0.04)
-      // Slight color variation — most white, some warm, some cool
-      const colors = ['#ffffff', '#ffffff', '#ffffff', '#fffde0', '#dde8ff']
-      star.setAttribute('material', `color: ${colors[Math.floor(Math.random() * colors.length)]}; emissive: #ffffff; emissiveIntensity: 0.8`)
-      container.appendChild(star)
-    }
-  })
-}
-
-// ─── Shooting Star Animation ─────────────────────────────────────────
-
-function fireShootingStar() {
-  shootingStar.setAttribute('visible', 'true')
-  shootingStar.setAttribute('position', '-30 12 -20')
-
-  // Main arc movement across the sky
-  shootingStar.setAttribute('animation__move', {
-    property: 'position',
-    to: '18 -4 -20',
-    dur: 2200,
-    easing: 'easeInQuad'
-  })
-
-  // Grow slightly as it approaches
-  shootingStar.setAttribute('animation__scale', {
-    property: 'scale',
-    from: '1 1 1',
-    to: '1.8 1.8 1.8',
-    dur: 2200,
-    easing: 'easeInQuad'
-  })
-
-  // Spawn trail dots every 80ms while it moves
-  let trailCount = 0
-  const trailInterval = setInterval(() => {
-    spawnTrailDot()
-    trailCount++
-    if (trailCount >= 26) clearInterval(trailInterval)
-  }, 80)
-
-  // After movement ends, trigger the burst
-  wait(2200).then(() => {
-    shootingStar.setAttribute('visible', 'false')
-    burstStar()
-  })
-}
-
-function spawnTrailDot() {
-  // Reads current shooting star position and drops a fading dot there
-  const pos = shootingStar.getAttribute('position')
-  if (!pos) return
-
-  const dot = document.createElement('a-sphere')
-  dot.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`)
-  dot.setAttribute('radius', '0.08')
-  dot.setAttribute('material', 'color: #ffffaa; emissive: #ffee88; emissiveIntensity: 1; transparent: true; opacity: 0.9')
-
-  // Fade out and shrink
-  dot.setAttribute('animation__fade', {
-    property: 'material.opacity',
-    from: '0.9',
-    to: '0',
-    dur: 900,
-    easing: 'easeOutQuad'
-  })
-  dot.setAttribute('animation__shrink', {
-    property: 'scale',
-    from: '1 1 1',
-    to: '0.1 0.1 0.1',
-    dur: 900,
-    easing: 'easeOutQuad'
-  })
-
-  starTrail.appendChild(dot)
-
-  // Remove from DOM after fade so we don't pile up elements
-  wait(950).then(() => {
-    if (dot.parentNode) dot.parentNode.removeChild(dot)
-  })
-}
-
-function burstStar() {
-  const burstPos = '18 -4 -20'
-
-  // Spawn 16 burst particles flying outward in all directions
-  for (let i = 0; i < 16; i++) {
-    const angle  = (i / 16) * Math.PI * 2
-    const spread = 3 + Math.random() * 4
-    const tx = 18 + Math.cos(angle) * spread
-    const ty = -4 + Math.sin(angle) * spread
-    const colors = ['#ffffff', '#ffffaa', '#ffddaa', '#aaddff']
-
-    const particle = document.createElement('a-sphere')
-    particle.setAttribute('position', burstPos)
-    particle.setAttribute('radius', '0.1')
-    particle.setAttribute('material', `color: ${colors[i % colors.length]}; emissive: #ffffff; emissiveIntensity: 1; transparent: true; opacity: 1`)
-
-    particle.setAttribute('animation__move', {
-      property: 'position',
-      to: `${tx} ${ty} -20`,
-      dur: 800,
-      easing: 'easeOutQuad'
-    })
-    particle.setAttribute('animation__fade', {
-      property: 'material.opacity',
-      from: '1',
-      to: '0',
-      dur: 800,
-      easing: 'easeOutQuad'
-    })
-
-    burstContainer.appendChild(particle)
-    wait(820).then(() => {
-      if (particle.parentNode) particle.parentNode.removeChild(particle)
-    })
-  }
-
-  // Flash of light at burst point
-  const flash = document.createElement('a-sphere')
-  flash.setAttribute('position', burstPos)
-  flash.setAttribute('radius', '0.6')
-  flash.setAttribute('material', 'color: #ffffff; emissive: #ffffff; emissiveIntensity: 2; transparent: true; opacity: 1')
-  flash.setAttribute('animation__fade', {
-    property: 'material.opacity',
-    from: '1',
-    to: '0',
-    dur: 400,
-    easing: 'easeOutQuad'
-  })
-  flash.setAttribute('animation__grow', {
-    property: 'scale',
-    from: '1 1 1',
-    to: '3 3 3',
-    dur: 400,
-    easing: 'easeOutQuad'
-  })
-  burstContainer.appendChild(flash)
-  wait(420).then(() => {
-    if (flash.parentNode) flash.parentNode.removeChild(flash)
-  })
-}
-
-// ─── Central Pulsing Star ─────────────────────────────────────────────
-
-function startCentralStar() {
-  centralStar.setAttribute('visible', 'true')
-
-  // Starts tiny and breathes in
-  centralStar.setAttribute('scale', '0.1 0.1 0.1')
-  centralStar.setAttribute('animation__appear', {
-    property: 'scale',
-    from: '0.1 0.1 0.1',
-    to: '1 1 1',
-    dur: 2000,
-    easing: 'easeOutElastic'
-  })
-
-  // After appearing, start the slow pulse loop
-  wait(2000).then(() => pulseCentralStar())
-}
-
-function pulseCentralStar() {
-  centralStar.setAttribute('animation__pulse', {
-    property: 'scale',
-    from: '1 1 1',
-    to: '1.4 1.4 1.4',
-    dur: 1800,
-    easing: 'easeInOutSine',
-    loop: true,
-    dir: 'alternate'
-  })
-
-  // Emissive intensity breathes between dim and bright
-  centralStar.setAttribute('animation__glow', {
-    property: 'material.emissiveIntensity',
-    from: '0.6',
-    to: '2',
-    dur: 1800,
-    easing: 'easeInOutSine',
-    loop: true,
-    dir: 'alternate'
-  })
-}
-
-function bloomCentralStar() {
-  // Fires on "make them come true" — star expands and fades
-  centralStar.removeAttribute('animation__pulse')
-  centralStar.removeAttribute('animation__glow')
-
-  centralStar.setAttribute('animation__bloom', {
-    property: 'scale',
-    from: '1.4 1.4 1.4',
-    to: '8 8 8',
-    dur: 1200,
-    easing: 'easeOutQuad'
-  })
-  centralStar.setAttribute('animation__fade', {
-    property: 'material.opacity',
-    from: '1',
-    to: '0',
-    dur: 1200,
-    easing: 'easeOutQuad'
-  })
-
-  // Spawn a ring of smaller stars outward as it blooms
-  for (let i = 0; i < 12; i++) {
-    const angle = (i / 12) * Math.PI * 2
-    const dist  = 4 + Math.random() * 3
-    const tx = Math.cos(angle) * dist
-    const ty = Math.sin(angle) * dist
-
-    const ringDot = document.createElement('a-sphere')
-    ringDot.setAttribute('position', '0 1.6 -15')
-    ringDot.setAttribute('radius', '0.08')
-    ringDot.setAttribute('material', 'color: #ffffff; emissive: #aaddff; emissiveIntensity: 1.5; transparent: true; opacity: 1')
-    ringDot.setAttribute('animation__move', {
-      property: 'position',
-      to: `${tx} ${1.6 + ty} -15`,
-      dur: 1000,
-      easing: 'easeOutQuad'
-    })
-    ringDot.setAttribute('animation__fade', {
-      property: 'material.opacity',
-      from: '1',
-      to: '0',
-      dur: 1000,
-      easing: 'easeOutQuad'
-    })
-    burstContainer.appendChild(ringDot)
-    wait(1050).then(() => {
-      if (ringDot.parentNode) ringDot.parentNode.removeChild(ringDot)
-    })
-  }
-
-  wait(1300).then(() => {
-    centralStar.setAttribute('visible', 'false')
-  })
-}
-
-
-startButton.addEventListener('click', async () =>{
-
-  //Fade to black
-    fadeOverlay.classList.add('visible');
-    await wait(1000);
-
-    welcomeOverlay.classList.add('hidden');
-
-    await wait(300);
-
-    try{
-      await introAudio.play();
-    } catch (error){
-      console.error('Audio has failed to play:', error);
-      alert('Intro Audio Could not play, check MP3 file.');
-    }
-
-    //Fade back in
-    fadeOverlay.classList.remove('visible');
-});
-
-introAudio.addEventListener('ended', () =>{
-    introHasFinished = true;
-    theaterButtonOverlay.classList.remove('hidden');
-});
-
-
-enterTheaterButton.addEventListener('click', async () => {
-  if (!introHasFinished) return
-
-  theaterButtonOverlay.classList.add('hidden')
-
-  fadeOverlay.classList.add('visible')
-  await wait(1000)
-
-  introRoom.setAttribute('visible', 'false')
-  theaterRoom.setAttribute('visible', 'true')
-  cameraRig.setAttribute('position', '0 0 6')
-
-  songControlsOverlay.classList.remove('hidden')
-  albumIntroSpace.setAttribute('visible', 'true')
-
-  await wait(300)
-
-  fadeOverlay.classList.remove('visible')
-
-  // Start song
-  try {
-    songAudio.currentTime = 0
-    songAudio.volume = 0
-    await songAudio.play()
-    await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
-  } catch (error) {
-    console.error('Song failed to play:', error)
-    alert('The song could not play. Check that /public/audio/song.mp3 exists.')
-  };
-
-// Play Blender approach animation, then transition into the memory room
-  try {
-    await playApproachClip()
-    await transitionToMemoryRoom()
-  } catch (error) {
-    console.error('Approach clip or transition failed:', error)
-  }
-});
-
-playSongButton.addEventListener('click', async () =>{
-    try{
-      clearFade();
-
-      if(songAudio.paused){
-        songAudio.volume = 0;
-        await songAudio.play();
-        await fadeOutAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION);
-      } else {
-        await fadeOutAudio(songAudio, songAudio.volume, SONG_TARGET_VOLUME, FADE_DURATION);
-      }
-      
-    } catch (error){
-      console.error('Song has failed to play:', error);
-    }
-});
-
-pauseSongButton.addEventListener('click', async () =>{
-    if(songAudio.paused) return;
-
-    await fadeOutAudio(songAudio, songAudio.volume, 0, FADE_DURATION)
-    songAudio.pause();
-});
-
-restartSongButton.addEventListener('click', async () => {
-  try {
-    clearFade()
-
-    songAudio.pause()
-    songAudio.currentTime = 0
-    songAudio.volume = 0
-
-    await songAudio.play()
-    await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
-    await playApproachClip()
-    await transitionToMemoryRoom()
-  } catch (error) {
-    console.error('Song failed to restart:', error)
-  }
-});
