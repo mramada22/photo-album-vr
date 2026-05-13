@@ -41,13 +41,12 @@ document.querySelector('#app').innerHTML = `
       <a-asset-item id="approachAlbumModel" src="/models/approach_album.glb"></a-asset-item>
       <audio id="introAudio" src="/audio/intro.mp3" preload="auto"></audio>
       <audio id="songAudio" src="/audio/song.mp3" preload="auto"></audio>
-      <video id="memoryVideo" src="/video/memory.mp4" preload="auto" loop crossorigin="anonymous"></video>
     </a-assets>
 
     <a-sky id="sky" color="#111111"></a-sky>
 
     <a-entity id="cameraRig" position="0 0 4">
-      <a-camera id="camera" wasd-controls-enabled="true" look-controls="enabled: false"></a-camera>
+      <a-camera id="camera" wasd-controls="enabled: false" look-controls="enabled: true"></a-camera>
     </a-entity>
 
  <!-- Intro Room -->
@@ -106,27 +105,45 @@ document.querySelector('#app').innerHTML = `
 
     <!-- ===== MEMORY ROOM ===== -->
     <a-entity id="memoryRoom" visible="false">
+      <!-- Space backdrop — large sphere surrounding the camera -->
+      <a-sphere
+        id="spaceSphere"
+        radius="80"
+        color="#000010"
+        side="back">
+      </a-sphere>
 
-      <!-- The floor, ceiling, and 3 walls that box you in -->
-      <a-plane position="0 0 -4"  rotation="-90 0 0" width="14" height="14" color="#5c3d1e"></a-plane>
-      <a-plane position="0 3 -4"  rotation="90 0 0"  width="14" height="14" color="#2a1a0e"></a-plane>
-      <a-plane position="0 1.5 -11" width="14" height="6" color="#3b2410"></a-plane>
-      <a-plane position="-7 1.5 -4" rotation="0 90 0"  width="14" height="6" color="#3b2410"></a-plane>
-      <a-plane position="7 1.5 -4"  rotation="0 -90 0" width="14" height="6" color="#3b2410"></a-plane>
+      <!-- Star field — 3 layers at different depths for parallax feel -->
+      <a-entity id="starLayer1"></a-entity>
+      <a-entity id="starLayer2"></a-entity>
+      <a-entity id="starLayer3"></a-entity>
 
-      <!-- Warm amber lighting — starts dim, will brighten during chorus -->
-      <a-light id="memoryAmbient" type="ambient" intensity="0.3" color="#ffcc88"></a-light>
-      <a-light id="memorySpot"    type="point"   intensity="0.5" color="#ffaa44"
-               position="0 2.8 -4" distance="10"></a-light>
+      <!-- Central pulsing star -->
+      <a-sphere
+        id="centralStar"
+        position="0 1.6 -15"
+        radius="0.3"
+        color="#ffffff"
+        visible="false"
+        material="color: #ffffff; emissive: #ffffff; emissiveIntensity: 1">
+      </a-sphere>
 
-      <!-- Empty container — polaroids will be created here by JS -->
-      <a-entity id="polaroidContainer"></a-entity>
+      <!-- Shooting star — starts offscreen, animates across -->
+      <a-sphere
+        id="shootingStar"
+        position="-30 12 -20"
+        radius="0.18"
+        visible="false"
+        material="color: #ffffff; emissive: #ffffaa; emissiveIntensity: 1.5">
+      </a-sphere>
 
-      <!-- Picture frame with video — hidden until the bridge section -->
-      <a-entity id="pictureFrameGroup" position="0 1.6 -9" visible="false">
-        <a-box width="2.4" height="1.8" depth="0.05" color="#3b2410"></a-box>
-        <a-video src="#memoryVideo" width="2" height="1.4" position="0 0 0.04"></a-video>
-      </a-entity>
+      <!-- Trail container — dots spawned by JS behind the shooting star -->
+      <a-entity id="starTrail"></a-entity>
+
+      <!-- Burst particles — spawned by JS on explosion -->
+      <a-entity id="burstContainer"></a-entity>
+
+  
 
     </a-entity>
 
@@ -156,11 +173,13 @@ const albumIntroSpace = document.getElementById('albumIntroSpace')
 const approachAlbumEntity = document.getElementById('approachAlbumEntity')
 
 const memoryRoom          = document.getElementById('memoryRoom')
-const memoryAmbient       = document.getElementById('memoryAmbient')
-const memorySpot          = document.getElementById('memorySpot')
-const polaroidContainer   = document.getElementById('polaroidContainer')
-const pictureFrameGroup   = document.getElementById('pictureFrameGroup')
-const memoryVideo         = document.getElementById('memoryVideo')
+const centralStar         = document.getElementById('centralStar')
+const shootingStar        = document.getElementById('shootingStar')
+const starTrail           = document.getElementById('starTrail')
+const burstContainer      = document.getElementById('burstContainer')
+const starLayer1          = document.getElementById('starLayer1')
+const starLayer2          = document.getElementById('starLayer2')
+const starLayer3          = document.getElementById('starLayer3')
 
 let introHasFinished = false; 
 
@@ -297,7 +316,7 @@ async function transitionToMemoryRoom() {
   memoryRoom.setAttribute('visible', 'true')
 
   // Drop the camera inside the room, facing the back wall
-  cameraRig.setAttribute('position', '0 1.6 -2')
+  cameraRig.setAttribute('position', '-16 1.6 6')
   cameraRig.setAttribute('rotation', '0 0 0')
   setCameraRotation(0, 0, 0)
 
@@ -349,15 +368,10 @@ function fadeOutAudio(audio, startVolume, endVolume, duration){
 
 // ─── Song Cue System ────────────────────────────────────────────────
 // Each entry fires once when songAudio.currentTime passes the 'time' value.
-// Adjust the time values (in seconds) to match your actual song structure.
-
 const SONG_CUES = [
-  { time: 2,   fn: spawnPolaroids },       // Verse 1 starts
-  { time: 35,  fn: triggerPageTurn },      // Pre-chorus
-  { time: 55,  fn: warmRoomUp },           // Chorus: room brightens
-  { time: 90,  fn: showCameraFrame },      // Verse 2: frame appears on wall
-  { time: 120, fn: showVideoFrames },      // Bridge: video frame appears
-  { time: 145, fn: fullWarmth },           // Final chorus: full brightness
+  { time: 0,  fn: startCentralStar },
+  { time: 8,  fn: fireShootingStar },
+  { time: 18, fn: bloomCentralStar },
 ]
 
 let firedCues = new Set()   // tracks which cues have already fired
@@ -365,125 +379,285 @@ let cueListener = null      // reference so we can remove the listener on restar
 
 function startMemoryRoomSequence() {
   firedCues.clear()
-  // Remove any old listener from a previous playthrough
   if (cueListener) songAudio.removeEventListener('timeupdate', cueListener)
+
+  // Build the star field immediately when the room appears
+  buildStarField()
 
   cueListener = () => {
     const t = songAudio.currentTime
     SONG_CUES.forEach((cue, i) => {
       if (t >= cue.time && !firedCues.has(i)) {
         firedCues.add(i)
-        cue.fn()           // fire the animation function
+        cue.fn()
       }
     })
   }
   songAudio.addEventListener('timeupdate', cueListener)
-};
+}
 
-// ─── Memory Room Animations ─────────────────────────────────────────
+// ─── Space Environment Setup ────────────────────────────────────────
 
-function spawnPolaroids() {
-  // Positions and rotations for 6 floating polaroids around the room
-  const polaroids = [
-    { pos: '-2 1.8 -5',   rot: '0 10 -8'  },
-    { pos: '-0.5 2.2 -6', rot: '0 -5 12'  },
-    { pos: '1.5 1.5 -5.5',rot: '0 -15 5'  },
-    { pos: '2.2 2 -7',    rot: '0 20 -10' },
-    { pos: '-1.8 1.4 -7', rot: '0 8 15'   },
-    { pos: '0.3 2.5 -8',  rot: '0 -12 -6' },
+function buildStarField() {
+  // Creates 3 layers of stars at different distances for depth
+  const layers = [
+    { container: starLayer1, count: 80,  minDist: 30, maxDist: 50, size: 0.08 },
+    { container: starLayer2, count: 120, minDist: 50, maxDist: 65, size: 0.05 },
+    { container: starLayer3, count: 60,  minDist: 20, maxDist: 35, size: 0.12 },
   ]
 
-  polaroids.forEach(({ pos, rot }, i) => {
-    setTimeout(() => {
-      // The outer entity positions the polaroid in space
-      const entity = document.createElement('a-entity')
-      entity.setAttribute('position', pos)
-      entity.setAttribute('rotation', rot)
+  layers.forEach(({ container, count, minDist, maxDist, size }) => {
+    for (let i = 0; i < count; i++) {
+      // Random point on a sphere surface using spherical coordinates
+      const theta = Math.random() * Math.PI * 2
+      const phi   = Math.acos(2 * Math.random() - 1)
+      const dist  = minDist + Math.random() * (maxDist - minDist)
 
-      // White card (the polaroid itself)
-      const card = document.createElement('a-box')
-      card.setAttribute('width', '0.55')
-      card.setAttribute('height', '0.66')
-      card.setAttribute('depth', '0.01')
-      card.setAttribute('color', '#f5f0e8')
-      // Animates upward from slightly below its final position with a bounce
-      card.setAttribute('animation', [
-        'property: position;',
-        'from: 0 -0.4 0;',
-        'to: 0 0 0;',
-        'dur: 900;',
-        'easing: easeOutBack'
-      ].join(' '))
+      const x = dist * Math.sin(phi) * Math.cos(theta)
+      const y = dist * Math.sin(phi) * Math.sin(theta)
+      const z = dist * Math.cos(phi)
 
-      entity.appendChild(card)
-      polaroidContainer.appendChild(entity)
-    }, i * 700) // each polaroid appears 700ms after the last
+      const star = document.createElement('a-sphere')
+      star.setAttribute('position', `${x} ${y} ${z}`)
+      star.setAttribute('radius', size + Math.random() * 0.04)
+      // Slight color variation — most white, some warm, some cool
+      const colors = ['#ffffff', '#ffffff', '#ffffff', '#fffde0', '#dde8ff']
+      star.setAttribute('material', `color: ${colors[Math.floor(Math.random() * colors.length)]}; emissive: #ffffff; emissiveIntensity: 0.8`)
+      container.appendChild(star)
+    }
   })
 }
 
-function triggerPageTurn() {
-  // Dims the ambient light slightly — room feels more introspective
-  // You'll replace this later with a Blender page-turn GLB animation
-  let intensity = 0.3
-  const target = 0.15
-  const interval = setInterval(() => {
-    intensity = Math.max(target, intensity - 0.008)
-    memoryAmbient.setAttribute('light', `type: ambient; intensity: ${intensity}; color: #ffcc88`)
-    if (intensity <= target) clearInterval(interval)
-  }, 40)
+// ─── Shooting Star Animation ─────────────────────────────────────────
+
+function fireShootingStar() {
+  shootingStar.setAttribute('visible', 'true')
+  shootingStar.setAttribute('position', '-30 12 -20')
+
+  // Main arc movement across the sky
+  shootingStar.setAttribute('animation__move', {
+    property: 'position',
+    to: '18 -4 -20',
+    dur: 2200,
+    easing: 'easeInQuad'
+  })
+
+  // Grow slightly as it approaches
+  shootingStar.setAttribute('animation__scale', {
+    property: 'scale',
+    from: '1 1 1',
+    to: '1.8 1.8 1.8',
+    dur: 2200,
+    easing: 'easeInQuad'
+  })
+
+  // Spawn trail dots every 80ms while it moves
+  let trailCount = 0
+  const trailInterval = setInterval(() => {
+    spawnTrailDot()
+    trailCount++
+    if (trailCount >= 26) clearInterval(trailInterval)
+  }, 80)
+
+  // After movement ends, trigger the burst
+  wait(2200).then(() => {
+    shootingStar.setAttribute('visible', 'false')
+    burstStar()
+  })
 }
 
-function warmRoomUp() {
-  // Gradually brightens the room for the chorus
-  let intensity = parseFloat(memoryAmbient.getAttribute('light').intensity) || 0.3
-  const target = 0.75
-  const interval = setInterval(() => {
-    intensity = Math.min(target, intensity + 0.008)
-    memoryAmbient.setAttribute('light', `type: ambient; intensity: ${intensity}; color: #ffcc88`)
-    memorySpot.setAttribute('light', `type: point; intensity: ${Math.min(1.2, intensity * 1.5)}; color: #ffaa44; distance: 10`)
-    if (intensity >= target) clearInterval(interval)
-  }, 40)
+function spawnTrailDot() {
+  // Reads current shooting star position and drops a fading dot there
+  const pos = shootingStar.getAttribute('position')
+  if (!pos) return
+
+  const dot = document.createElement('a-sphere')
+  dot.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`)
+  dot.setAttribute('radius', '0.08')
+  dot.setAttribute('material', 'color: #ffffaa; emissive: #ffee88; emissiveIntensity: 1; transparent: true; opacity: 0.9')
+
+  // Fade out and shrink
+  dot.setAttribute('animation__fade', {
+    property: 'material.opacity',
+    from: '0.9',
+    to: '0',
+    dur: 900,
+    easing: 'easeOutQuad'
+  })
+  dot.setAttribute('animation__shrink', {
+    property: 'scale',
+    from: '1 1 1',
+    to: '0.1 0.1 0.1',
+    dur: 900,
+    easing: 'easeOutQuad'
+  })
+
+  starTrail.appendChild(dot)
+
+  // Remove from DOM after fade so we don't pile up elements
+  wait(950).then(() => {
+    if (dot.parentNode) dot.parentNode.removeChild(dot)
+  })
 }
 
-function showCameraFrame() {
-  // Makes a picture frame appear on the back wall
-  // Later you'll swap this entity for a Blender model of an actual frame
-  const frame = document.createElement('a-entity')
-  frame.setAttribute('position', '-2.5 1.8 -8')
-  frame.setAttribute('rotation', '0 15 0')
+function burstStar() {
+  const burstPos = '18 -4 -20'
 
-  const border = document.createElement('a-box')
-  border.setAttribute('width', '1')
-  border.setAttribute('height', '0.8')
-  border.setAttribute('depth', '0.05')
-  border.setAttribute('color', '#3b2410')
-  border.setAttribute('animation', 'property: scale; from: 0 0 0; to: 1 1 1; dur: 1000; easing: easeOutElastic')
+  // Spawn 16 burst particles flying outward in all directions
+  for (let i = 0; i < 16; i++) {
+    const angle  = (i / 16) * Math.PI * 2
+    const spread = 3 + Math.random() * 4
+    const tx = 18 + Math.cos(angle) * spread
+    const ty = -4 + Math.sin(angle) * spread
+    const colors = ['#ffffff', '#ffffaa', '#ffddaa', '#aaddff']
 
-  frame.appendChild(border)
-  memoryRoom.appendChild(frame)
-}
+    const particle = document.createElement('a-sphere')
+    particle.setAttribute('position', burstPos)
+    particle.setAttribute('radius', '0.1')
+    particle.setAttribute('material', `color: ${colors[i % colors.length]}; emissive: #ffffff; emissiveIntensity: 1; transparent: true; opacity: 1`)
 
-function showVideoFrames() {
-  // Reveals the large video frame on the back wall and starts playback
-  pictureFrameGroup.setAttribute('visible', 'true')
-  pictureFrameGroup.setAttribute('animation', [
-    'property: scale;',
-    'from: 0 0 0;',
-    'to: 1 1 1;',
-    'dur: 1200;',
-    'easing: easeOutBack'
-  ].join(' '))
-  // Start playing the video
-  if (memoryVideo) {
-    memoryVideo.play().catch(err => console.warn('Video autoplay blocked:', err))
+    particle.setAttribute('animation__move', {
+      property: 'position',
+      to: `${tx} ${ty} -20`,
+      dur: 800,
+      easing: 'easeOutQuad'
+    })
+    particle.setAttribute('animation__fade', {
+      property: 'material.opacity',
+      from: '1',
+      to: '0',
+      dur: 800,
+      easing: 'easeOutQuad'
+    })
+
+    burstContainer.appendChild(particle)
+    wait(820).then(() => {
+      if (particle.parentNode) particle.parentNode.removeChild(particle)
+    })
   }
+
+  // Flash of light at burst point
+  const flash = document.createElement('a-sphere')
+  flash.setAttribute('position', burstPos)
+  flash.setAttribute('radius', '0.6')
+  flash.setAttribute('material', 'color: #ffffff; emissive: #ffffff; emissiveIntensity: 2; transparent: true; opacity: 1')
+  flash.setAttribute('animation__fade', {
+    property: 'material.opacity',
+    from: '1',
+    to: '0',
+    dur: 400,
+    easing: 'easeOutQuad'
+  })
+  flash.setAttribute('animation__grow', {
+    property: 'scale',
+    from: '1 1 1',
+    to: '3 3 3',
+    dur: 400,
+    easing: 'easeOutQuad'
+  })
+  burstContainer.appendChild(flash)
+  wait(420).then(() => {
+    if (flash.parentNode) flash.parentNode.removeChild(flash)
+  })
 }
 
-function fullWarmth() {
-  // Final chorus — push lights to their warmest, brightest state
-  memoryAmbient.setAttribute('light', 'type: ambient; intensity: 1; color: #ffddaa')
-  memorySpot.setAttribute('light',    'type: point;   intensity: 2; color: #ffbb55; distance: 14')
+// ─── Central Pulsing Star ─────────────────────────────────────────────
+
+function startCentralStar() {
+  centralStar.setAttribute('visible', 'true')
+
+  // Starts tiny and breathes in
+  centralStar.setAttribute('scale', '0.1 0.1 0.1')
+  centralStar.setAttribute('animation__appear', {
+    property: 'scale',
+    from: '0.1 0.1 0.1',
+    to: '1 1 1',
+    dur: 2000,
+    easing: 'easeOutElastic'
+  })
+
+  // After appearing, start the slow pulse loop
+  wait(2000).then(() => pulseCentralStar())
 }
+
+function pulseCentralStar() {
+  centralStar.setAttribute('animation__pulse', {
+    property: 'scale',
+    from: '1 1 1',
+    to: '1.4 1.4 1.4',
+    dur: 1800,
+    easing: 'easeInOutSine',
+    loop: true,
+    dir: 'alternate'
+  })
+
+  // Emissive intensity breathes between dim and bright
+  centralStar.setAttribute('animation__glow', {
+    property: 'material.emissiveIntensity',
+    from: '0.6',
+    to: '2',
+    dur: 1800,
+    easing: 'easeInOutSine',
+    loop: true,
+    dir: 'alternate'
+  })
+}
+
+function bloomCentralStar() {
+  // Fires on "make them come true" — star expands and fades
+  centralStar.removeAttribute('animation__pulse')
+  centralStar.removeAttribute('animation__glow')
+
+  centralStar.setAttribute('animation__bloom', {
+    property: 'scale',
+    from: '1.4 1.4 1.4',
+    to: '8 8 8',
+    dur: 1200,
+    easing: 'easeOutQuad'
+  })
+  centralStar.setAttribute('animation__fade', {
+    property: 'material.opacity',
+    from: '1',
+    to: '0',
+    dur: 1200,
+    easing: 'easeOutQuad'
+  })
+
+  // Spawn a ring of smaller stars outward as it blooms
+  for (let i = 0; i < 12; i++) {
+    const angle = (i / 12) * Math.PI * 2
+    const dist  = 4 + Math.random() * 3
+    const tx = Math.cos(angle) * dist
+    const ty = Math.sin(angle) * dist
+
+    const ringDot = document.createElement('a-sphere')
+    ringDot.setAttribute('position', '0 1.6 -15')
+    ringDot.setAttribute('radius', '0.08')
+    ringDot.setAttribute('material', 'color: #ffffff; emissive: #aaddff; emissiveIntensity: 1.5; transparent: true; opacity: 1')
+    ringDot.setAttribute('animation__move', {
+      property: 'position',
+      to: `${tx} ${1.6 + ty} -15`,
+      dur: 1000,
+      easing: 'easeOutQuad'
+    })
+    ringDot.setAttribute('animation__fade', {
+      property: 'material.opacity',
+      from: '1',
+      to: '0',
+      dur: 1000,
+      easing: 'easeOutQuad'
+    })
+    burstContainer.appendChild(ringDot)
+    wait(1050).then(() => {
+      if (ringDot.parentNode) ringDot.parentNode.removeChild(ringDot)
+    })
+  }
+
+  wait(1300).then(() => {
+    centralStar.setAttribute('visible', 'false')
+  })
+}
+
 
 startButton.addEventListener('click', async () =>{
 
