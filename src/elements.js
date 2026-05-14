@@ -18,17 +18,14 @@ export function getElements() {
     albumIntroSpace:          document.getElementById('albumIntroSpace'),
     approachAlbumEntity:      document.getElementById('approachAlbumEntity'),
     memoryRoom:               document.getElementById('memoryRoom'),
-    centralStar:              document.getElementById('centralStar'),
+    preChorusRoom:            document.getElementById('preChorusRoom'),
     shootingStar:             document.getElementById('shootingStar'),
     starTrail:                document.getElementById('starTrail'),
     burstContainer:           document.getElementById('burstContainer'),
     starLayer1:               document.getElementById('starLayer1'),
     starLayer2:               document.getElementById('starLayer2'),
     starLayer3:               document.getElementById('starLayer3'),
-    worldPlanet:              document.getElementById('worldPlanet'),
     floatingTextContainer:    document.getElementById('floatingTextContainer'),
     constellationContainer:   document.getElementById('constellationContainer'),
-    preChorusRoom: document.getElementById('preChorusRoom'),
-    starImage: document.getElementById('starImage'),
   }
 }

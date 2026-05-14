@@ -1,8 +1,8 @@
 // src/animations/space.js
+// Space environment — star field, shooting star, central pulsing star.
+
 import { getElements } from '../elements.js'
 import { wait } from '../scene/camera.js'
-
-// ─── Image Preloader ─────────────────────────────────────────────────
 
 function createVignettedImage(src) {
   return new Promise(resolve => {
@@ -20,14 +20,12 @@ function createVignettedImage(src) {
       const h = img.height * scale
       ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h)
 
-      // Cut hard circular mask
       ctx.globalCompositeOperation = 'destination-in'
       ctx.beginPath()
       ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
       ctx.fillStyle = 'black'
       ctx.fill()
 
-      // Soft fade over the circular mask
       ctx.globalCompositeOperation = 'destination-out'
       const gradient = ctx.createRadialGradient(
         size / 2, size / 2, size * 0.2,
@@ -53,11 +51,6 @@ function createVignettedImage(src) {
   })
 }
 
-// Store the promise itself — not just the result
-// Any code that needs the image awaits this promise directly
-const starImagePromise = createVignettedImage('/images/praying_hands.png')
-
-// ─── Star Field ───────────────────────────────────────────────────────
 
 export function buildStarField() {
   const { starLayer1, starLayer2, starLayer3 } = getElements()
@@ -105,8 +98,6 @@ export function buildStarField() {
     }
   })
 }
-
-// ─── Shooting Star Animation ──────────────────────────────────────────
 
 export function fireShootingStar() {
   const { shootingStar } = getElements()
@@ -232,10 +223,8 @@ function burstStar() {
   })
 }
 
-// ─── Central Pulsing Star ─────────────────────────────────────────────
-
 export function startCentralStar() {
-  const { centralStar, starImage } = getElements()
+  const { centralStar} = getElements()
 
   centralStar.setAttribute('visible', 'true')
   centralStar.setAttribute('scale', '0.1 0.1 0.1')
@@ -247,29 +236,7 @@ export function startCentralStar() {
     easing: 'easeOutElastic'
   })
 
-  // Wait for both the appear animation AND the image to be ready
-  Promise.all([
-    wait(1800),
-    starImagePromise
-  ]).then(([, vignettedSrc]) => {
-    if (!vignettedSrc) {
-      console.warn('Star image failed to load — showing star without image')
-      pulseCentralStar()
-      return
-    }
 
-    starImage.setAttribute('visible', 'true')
-    starImage.setAttribute('material', [
-      `src: ${vignettedSrc};`,
-      'shader: flat;',
-      'transparent: true;',
-      'alphaTest: 0.01;',
-      'side: double;',
-      'depthWrite: false'
-    ].join(' '))
-
-    pulseCentralStar()
-  })
 }
 
 function pulseCentralStar() {
@@ -296,21 +263,10 @@ function pulseCentralStar() {
 }
 
 export function bloomCentralStar() {
-  const { centralStar, burstContainer, starImage } = getElements()
+  const { centralStar, burstContainer} = getElements()
 
   centralStar.removeAttribute('animation__pulse')
   centralStar.removeAttribute('animation__glow')
-
-  starImage.setAttribute('animation__shrink', {
-    property: 'scale',
-    from: '1 1 1',
-    to: '0 0 0',
-    dur: 300,
-    easing: 'easeInQuad'
-  })
-  wait(320).then(() => {
-    starImage.setAttribute('visible', 'false')
-  })
 
   centralStar.setAttribute('animation__bloom', {
     property: 'scale',

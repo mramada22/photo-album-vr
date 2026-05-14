@@ -24,6 +24,7 @@ export function animateCameraRigTo(position, duration = 3000, easing = 'easeInOu
 }
 
 export function animateCameraRigRotationTo(rotation, duration = 3000, easing = 'easeInOutQuad') {
+  const { cameraRig } = getElements()
   cameraRig.removeAttribute('animation__rotate')
   cameraRig.setAttribute('animation__rotate', {
     property: 'rotation',
@@ -47,7 +48,6 @@ export function animateCameraLookTo(rotation, duration = 3000, easing = 'easeInO
 }
 
 export function waitForModel(entity, timeout = 10000) {
-  const { cameraRig } = getElements()
   if (!entity) return Promise.reject(new Error('Entity is not defined'))
 
   return new Promise((resolve, reject) => {

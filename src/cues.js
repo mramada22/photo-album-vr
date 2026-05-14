@@ -1,13 +1,12 @@
 // src/cues.js
-import { buildStarField, fireShootingStar, startCentralStar, bloomCentralStar } from './animations/space.js'
-import { riseWorldPlanet, spawnFloatingWords, traceConstellationPath } from './animations/verse.js'
+// Song cue system — fires animation functions at specific song timestamps.
+
+import { buildStarField, fireShootingStar } from './animations/space.js'
+import {spawnFloatingWords, traceConstellationPath } from './animations/verse.js'
 
 export const SONG_CUES = [
-  { time: 0,  fn: startCentralStar       },
-  { time: 9,  fn: fireShootingStar       },
-  { time: 21, fn: bloomCentralStar       },
-  { time: 24, fn: riseWorldPlanet        },
-  { time: 28, fn: spawnFloatingWords     },
+  { time: 8.5,  fn: fireShootingStar       },
+  { time: 20, fn: spawnFloatingWords     },
   { time: 30, fn: traceConstellationPath },
 ]
 
@@ -29,7 +28,6 @@ export function startMemoryRoomSequence() {
         try {
           cue.fn()
         } catch (err) {
-          // Log the error but don't let it stop other cues from firing
           console.error(`Cue ${i} at time ${cue.time} failed:`, err)
         }
       }
