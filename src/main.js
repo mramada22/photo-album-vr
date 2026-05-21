@@ -27,6 +27,10 @@ document.querySelector('#app').innerHTML = `
     <button id="skipTrigger">Skip Intro (dev)</button>
   </div>
 
+  <div id="preChorusTestBtn" style="position: fixed; top: 50px; right: 16px; z-index: 999;">
+    <button id="preChorusTrigger">Test Pre-chorus (dev)</button>
+  </div>
+
   <div id="songControlsOverlay" class="controls-overlay hidden">
     <div class="controls-card">
       <button id="playSongButton">Play Song</button>
@@ -41,6 +45,7 @@ document.querySelector('#app').innerHTML = `
       <audio id="introAudio" src="/audio/intro.mp3" preload="auto"></audio>
       <audio id="songAudio"  src="/audio/song.mp3"  preload="auto"></audio>
       <img id="earthTexture" src="/images/earth.jpg" crossorigin="anonymous">
+      <a-asset-item id="preChorusFiguresAsset" src="/models/prechorus_figures.glb"></a-asset-item>
     </a-assets>
 
     <a-sky id="sky" color="#000005"></a-sky>
@@ -104,19 +109,18 @@ document.querySelector('#app').innerHTML = `
     <!-- ===== MEMORY ROOM ===== -->
     <a-entity id="memoryRoom" visible="false">
 
-    <a-sphere
-      id="spacePlanetEntity"
-      position="0 0 -4"
-      radius="2.5"
-      material="src: #earthTexture; shader: flat; side: double"
-      animation="property: rotation; to: 0 360 0; loop: true; dur: 30000; easing: linear">
-    </a-sphere>
+      <a-sphere
+        id="spacePlanetEntity"
+        position="0 0 -4"
+        radius="2.5"
+        material="src: #earthTexture; shader: flat; side: double"
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 30000; easing: linear">
+      </a-sphere>
 
       <!-- Star field layers for A-Frame animations -->
       <a-entity id="starLayer1"></a-entity>
       <a-entity id="starLayer2"></a-entity>
       <a-entity id="starLayer3"></a-entity>
-
 
       <!-- Shooting star -->
       <a-sphere
@@ -131,15 +135,6 @@ document.querySelector('#app').innerHTML = `
       <a-entity id="starTrail"></a-entity>
       <a-entity id="burstContainer"></a-entity>
 
-      <!-- Planet for "give her the world" -->
-      <a-sphere
-        id="worldPlanet"
-        position="0 -8 -15"
-        radius="1.2"
-        visible="false"
-        material="color: #1a6b3c; emissive: #0a3d8f; emissiveIntensity: 0.8; transparent: true; opacity: 1">
-      </a-sphere>
-
       <!-- Floating text container -->
       <a-entity id="floatingTextContainer"></a-entity>
 
@@ -150,13 +145,50 @@ document.querySelector('#app').innerHTML = `
 
     <!-- ===== PRE-CHORUS ROOM ===== -->
     <a-entity id="preChorusRoom" visible="false">
-      <a-sphere
-        id="preChorusSphere"
-        radius="80"
-        color="#0a0010"
-        side="back">
-      </a-sphere>
-      <a-light type="ambient" intensity="0.2" color="#8844ff"></a-light>
+
+      <!-- Floor -->
+      <a-plane position="0 0 -3" rotation="-90 0 0"
+        width="30" height="20"
+        material="color: #2a1a0a; roughness: 1">
+      </a-plane>
+
+      <!-- Ceiling -->
+      <a-plane position="0 3.5 -3" rotation="90 0 0"
+        width="30" height="20"
+        material="color: #1a1008; roughness: 1">
+      </a-plane>
+
+      <!-- Back wall -->
+      <a-plane position="0 1.75 -8" width="30" height="7"
+        material="color: #2c1f10; roughness: 1">
+      </a-plane>
+
+      <!-- Left wall -->
+      <a-plane position="-15 1.75 -3" rotation="0 90 0"
+        width="20" height="7"
+        material="color: #2a1e0f; roughness: 1">
+      </a-plane>
+
+      <!-- Right wall -->
+      <a-plane position="15 1.75 -3" rotation="0 -90 0"
+        width="20" height="7"
+        material="color: #2a1e0f; roughness: 1">
+      </a-plane>
+
+      <!-- Boosted lighting -->
+        <a-light type="ambient" intensity="1.5" color="#ff9944"></a-light>
+        <a-light type="point" position="-4 2.5 -4" intensity="3" color="#ffaa44" distance="10"></a-light>
+        <a-light type="point" position="4 2.5 -4"  intensity="3" color="#ffaa44" distance="10"></a-light>
+
+      <!-- Figures -->
+      <a-entity
+        id="preChorusFigures"
+        gltf-model="#preChorusFiguresAsset"
+        position="0 1.2 -5"
+        rotation="0 0 0"
+        scale="1 1 1">
+      </a-entity>
+
     </a-entity>
 
   </a-scene>
@@ -196,6 +228,27 @@ async function init() {
     }
     songAudio.addEventListener('timeupdate', preChorusCheck)
   }
+
+  document.getElementById('preChorusTrigger').addEventListener('click', async () => {
+    console.log('test button clicked')
+    document.getElementById('preChorusTestBtn').style.display = 'none'
+
+    const scene = document.querySelector('a-scene')
+    console.log('scene loaded:', scene.hasLoaded)
+    if (!scene.hasLoaded) {
+      console.log('waiting for scene to load...')
+      await new Promise(resolve => scene.addEventListener('loaded', resolve, { once: true }))
+      console.log('scene loaded now')
+    }
+
+    console.log('about to call transitionToPreChorus')
+    welcomeOverlay.classList.add('hidden')
+    songControlsOverlay.classList.remove('hidden')
+    introRoom.setAttribute('visible', 'false')
+
+    await transitionToPreChorus()
+    console.log('transitionToPreChorus finished')
+  })
 
   // ─── Event Listeners ──────────────────────────────────────────────
 

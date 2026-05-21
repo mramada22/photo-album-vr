@@ -19,6 +19,7 @@ export function getElements() {
     approachAlbumEntity:      document.getElementById('approachAlbumEntity'),
     memoryRoom:               document.getElementById('memoryRoom'),
     preChorusRoom:            document.getElementById('preChorusRoom'),
+    preChorusFigures:         document.getElementById('preChorusFigures'),
     shootingStar:             document.getElementById('shootingStar'),
     starTrail:                document.getElementById('starTrail'),
     burstContainer:           document.getElementById('burstContainer'),

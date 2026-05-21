@@ -65,7 +65,7 @@ export async function transitionToMemoryRoom(onComplete) {
 }
 
 export async function transitionToPreChorus(onComplete) {
-  const { fadeOverlay, memoryRoom, preChorusRoom, cameraRig, songControlsOverlay } = getElements()
+  const { fadeOverlay, memoryRoom, preChorusRoom, songControlsOverlay } = getElements()
 
   fadeOverlay.classList.add('visible')
   await wait(1200)
@@ -73,14 +73,15 @@ export async function transitionToPreChorus(onComplete) {
   memoryRoom.setAttribute('visible', 'false')
   preChorusRoom.setAttribute('visible', 'true')
 
-  cameraRig.setAttribute('position', '0 1.6 0')
-  cameraRig.setAttribute('rotation', '0 0 0')
-  setCameraRotation(0, 0, 0)
-
   if (onComplete) onComplete()
 
   await wait(300)
 
   songControlsOverlay.classList.remove('hidden')
   fadeOverlay.classList.remove('visible')
+
+  // Start the camera pan sequence
+  const { startPreChorusSequence } = await import('../animations/prechorus.js')
+  console.log('prechorus imported successfully')
+  startPreChorusSequence()
 }
