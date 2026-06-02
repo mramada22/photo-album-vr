@@ -20,6 +20,7 @@ export function getElements() {
     memoryRoom:               document.getElementById('memoryRoom'),
     preChorusRoom:            document.getElementById('preChorusRoom'),
     preChorusFigures:         document.getElementById('preChorusFigures'),
+    chorusRoom:               document.getElementById('chorusRoom'),
     shootingStar:             document.getElementById('shootingStar'),
     starTrail:                document.getElementById('starTrail'),
     burstContainer:           document.getElementById('burstContainer'),

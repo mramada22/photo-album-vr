@@ -1,6 +1,4 @@
 // src/scene/transitions.js
-// Scene transition flows.
-
 import { getElements } from '../elements.js'
 import {
   wait, setCameraRotation, animateCameraRigTo,
@@ -80,8 +78,48 @@ export async function transitionToPreChorus(onComplete) {
   songControlsOverlay.classList.remove('hidden')
   fadeOverlay.classList.remove('visible')
 
-  // Start the camera pan sequence
   const { startPreChorusSequence } = await import('../animations/prechorus.js')
-  console.log('prechorus imported successfully')
   startPreChorusSequence()
+}
+
+export async function transitionToChorus() {
+  const { fadeOverlay, preChorusRoom, cameraRig } = getElements()
+
+  // Screen is already going black from bookTear.js
+  // Wait for it to be fully opaque
+  await wait(400)
+
+  preChorusRoom.setAttribute('visible', 'false')
+
+  // Build chorus room while black
+  const { buildChorusRoom, startChorusSequence } = await import('../animations/chorus.js')
+  buildChorusRoom()
+
+  const chorusRoom = document.getElementById('chorusRoom')
+  if (chorusRoom) chorusRoom.setAttribute('visible', 'true')
+
+  // Snap camera to watch position while screen is still black —
+  // SPOT0 is at (0,0,0), camera watches from (0, 3.2, 3.5) looking down
+  const cam = document.getElementById('camera')
+  const rigObj = cameraRig.object3D
+
+  ;['animation__swing1','animation__swing2','animation__follow1','animation__follow2',
+    'animation__move','animation__rotate'
+  ].forEach(a => cameraRig.removeAttribute(a))
+  if (cam) {
+    cam.setAttribute('look-controls', 'enabled: false')
+    cam.removeAttribute('animation__zoom')
+  }
+
+  const toRad = d => d * Math.PI / 180
+  rigObj.position.set(0, 3.5, 3.0)
+  rigObj.rotation.set(toRad(-49.4), 0, 0)
+  if (cam && cam.components.camera) {
+    cam.components.camera.camera.fov = 55
+    cam.components.camera.camera.updateProjectionMatrix()
+  }
+
+  await wait(150)
+  fadeOverlay.classList.remove('visible')
+  startChorusSequence()
 }
