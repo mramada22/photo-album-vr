@@ -112,6 +112,14 @@ export async function transitionToChorus() {
   }
 
   const toRad = d => d * Math.PI / 180
+
+  // Reset look-controls yaw/pitch before disabling so stored rotation
+  // doesn't fight our programmatic snap and cause a spin
+  try {
+    const rlc = cam && cam.components['resettable-look-controls']
+    if (rlc) rlc.resetYaw(0)
+  } catch(e) { console.warn('yaw reset failed', e) }
+
   rigObj.position.set(0, 3.5, 3.0)
   rigObj.rotation.set(toRad(-49.4), 0, 0)
   if (cam && cam.components.camera) {

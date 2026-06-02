@@ -290,8 +290,12 @@ export async function startChorusSequence() {
   const toRad  = d => d * Math.PI / 180
 
   // Snap camera to CAM_WATCH — directly looking at SPOT0
-  // This is also done in transitionToChorus while black, but we do it
-  // here too as a safety net in case timing varies
+  // Reset look-controls yaw so it doesn't fight our rotation
+  try {
+    const rlc = cam && cam.components['resettable-look-controls']
+    if (rlc) rlc.resetYaw(0)
+  } catch(e) { console.warn('yaw reset failed', e) }
+
   rigObj.position.set(CAM_WATCH.x, CAM_WATCH.y, CAM_WATCH.z)
   rigObj.rotation.set(toRad(CAM_WATCH_ROT.x), toRad(CAM_WATCH_ROT.y), 0)
   if (cam && cam.components.camera) {
@@ -321,41 +325,7 @@ export async function startChorusSequence() {
   const vid0 = document.getElementById('chorusVideo0')
   if (vid0) vid0.play().catch(() => {})
 
-  // ── Phase 2: Re-center on landed page (800ms) ───────────────────
-  // Camera moves to (0, 1.8, 0.6) tilted -71.6° — mathematically
-  // points exactly at origin so the landed page is dead center.
-  const recenterStartPos = rigObj.position.clone()
-  const recenterStartRot = { x: rigObj.rotation.x, y: rigObj.rotation.y, z: rigObj.rotation.z }
-  const recenterEndPos   = { x: SPOT0.x, y: 2.0, z: SPOT0.z + 1.8 }
-  const recenterEndRot   = { x: toRad(-38.7), y: 0, z: 0 }
-  const recenterT0       = performance.now()
-
-  await new Promise(resolve => {
-    ;(function recenterTick() {
-      const t = Math.min((performance.now() - recenterT0) / 800, 1)
-      const e = easeInOutQuad(t)
-      rigObj.position.set(
-        recenterStartPos.x + (recenterEndPos.x - recenterStartPos.x) * e,
-        recenterStartPos.y + (recenterEndPos.y - recenterStartPos.y) * e,
-        recenterStartPos.z + (recenterEndPos.z - recenterStartPos.z) * e
-      )
-      rigObj.rotation.set(
-        recenterStartRot.x + (recenterEndRot.x - recenterStartRot.x) * e,
-        recenterStartRot.y + (recenterEndRot.y - recenterStartRot.y) * e,
-        0
-      )
-      const fov = 55 + (48 - 55) * e
-      if (cam && cam.components.camera) {
-        cam.components.camera.camera.fov = fov
-        cam.components.camera.camera.updateProjectionMatrix()
-      }
-      if (t < 1) requestAnimationFrame(recenterTick)
-      else resolve()
-    })()
-  })
-  dbg('re-centered on landed page')
-
-  // ── Phase 3: Crane to bird's-eye ─────────────────────────────────
+  // ── Phase 2: Crane straight to bird's-eye ───────────────────────
   const craneStartPos = rigObj.position.clone()
   const craneStartRot = { x: rigObj.rotation.x, y: rigObj.rotation.y, z: rigObj.rotation.z }
   const craneDur = 2200
@@ -377,7 +347,7 @@ export async function startChorusSequence() {
         craneStartRot.y + (endRot.y - craneStartRot.y) * e,
         0
       )
-      const fov = 48 + (42 - 48) * e
+      const fov = 55 + (42 - 55) * e
       if (cam && cam.components.camera) {
         cam.components.camera.camera.fov = fov
         cam.components.camera.camera.updateProjectionMatrix()
