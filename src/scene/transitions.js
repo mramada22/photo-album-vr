@@ -196,3 +196,17 @@ export async function transitionToFinalChorus() {
   fadeOverlay.classList.remove('visible')
   startFinalChorusSequence()
 }
+
+export async function transitionToFinalMemory() {
+  const { fadeOverlay } = getElements()
+
+  // finalChorus already zoomed to black — screen is fully black
+  await wait(200)
+
+  const { buildFinalMemoryRoom, startFinalMemorySequence } = await import('../animations/finalMemory.js')
+  buildFinalMemoryRoom()
+
+  await wait(50)
+
+  startFinalMemorySequence()
+}

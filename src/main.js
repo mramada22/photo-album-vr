@@ -21,25 +21,6 @@ document.querySelector('#app').innerHTML = `
 
   <div id="fadeOverlay" class="fade-overlay"></div>
 
-  <div id="skipIntroBtn" style="position: fixed; top: 16px; right: 16px; z-index: 999;">
-    <button id="skipTrigger">Skip Intro</button>
-  </div>
-
-  <div id="skipChorus1Btn" style="position: fixed; top: 60px; right: 16px; z-index: 999;">
-    <button id="skipChorus1Trigger">Skip to Chorus 1</button>
-  </div>
-
-  <div id="skipVerse2Btn" style="position: fixed; top: 104px; right: 16px; z-index: 999;">
-    <button id="skipVerse2Trigger">Skip to Verse 2</button>
-  </div>
-
-  <div id="skipBridgeBtn" style="position: fixed; top: 148px; right: 16px; z-index: 999;">
-    <button id="skipBridgeTrigger">Skip to Bridge</button>
-  </div>
-
-  <div id="skipFinalChorusBtn" style="position: fixed; top: 192px; right: 16px; z-index: 999;">
-    <button id="skipFinalChorusTrigger">Skip to Final Chorus</button>
-  </div>
 
   <div id="songControlsOverlay" class="controls-overlay hidden">
     <div class="controls-card">
@@ -67,7 +48,7 @@ document.querySelector('#app').innerHTML = `
   <a-scene renderer="antialias: false; colorManagement: true; physicallyCorrectLights: false; maxCanvasWidth: 1920; maxCanvasHeight: 1080">
     <a-assets>
       <a-asset-item id="approachAlbumModel" src="/models/approach_album.glb"></a-asset-item>
-      <audio id="introAudio" src="/audio/intro.mp3" preload="auto"></audio>
+      <audio id="introAudio" src="/audio/intro.wav" preload="auto"></audio>
       <audio id="songAudio"  src="/audio/song.mp3"  preload="auto"></audio>
       <img id="earthTexture" src="/images/earth.jpg" crossorigin="anonymous">
       <a-asset-item id="preChorusFiguresAsset" src="/models/prechorus_figures.glb"></a-asset-item>
@@ -91,8 +72,15 @@ document.querySelector('#app').innerHTML = `
       <a-light type="spot" position="0 4 -3" rotation="-90 0 0" intensity="1" angle="35"></a-light>
       <a-text id="introText" value="Welcome. An audio introduction will begin now."
         position="0 2 -7" align="center" width="8" color="#f5f5f5"></a-text>
-      <a-box position="0 1 -6" depth="0.8" height="1.2" width="1.2" color="#6f5cff"
-        animation="property: rotation; to: 0 360 0; loop: true; dur: 8000"></a-box>
+      <!-- Spinning closed book -->
+      <a-entity position="0 1 -6" animation="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear">
+        <!-- Book cover — flat and wide -->
+        <a-box depth="0.08" height="1.4" width="1.0" color="#2c1a0e" position="0 0 0"></a-box>
+        <!-- Book pages — slightly smaller, cream colored -->
+        <a-box depth="0.06" height="1.32" width="0.94" color="#f5f0e8" position="0.02 0 0"></a-box>
+        <!-- Spine — left edge, slightly thicker, darker -->
+        <a-box depth="0.10" height="1.4" width="0.06" color="#1a0f06" position="-0.53 0 0"></a-box>
+      </a-entity>
     </a-entity>
 
     <!-- Theater Room -->
@@ -261,6 +249,21 @@ async function init() {
 
   let bridgeFired = false, bridgeCheck = null
   let finalChorusFired = false, finalChorusCheck = null
+  let finalMemoryFired = false, finalMemoryCheck = null
+  function attachFinalMemoryListener() {
+    finalMemoryFired = false
+    import('./animations/finalMemory.js').then(m => m.buildFinalMemoryRoom())
+    if (finalMemoryCheck) songAudio.removeEventListener('timeupdate', finalMemoryCheck)
+    finalMemoryCheck = () => {
+      if (!finalMemoryFired && songAudio.currentTime >= 186) {
+        finalMemoryFired = true
+        songAudio.removeEventListener('timeupdate', finalMemoryCheck)
+        import('./scene/transitions.js').then(m => m.transitionToFinalMemory())
+      }
+    }
+    songAudio.addEventListener('timeupdate', finalMemoryCheck)
+  }
+
   function attachFinalChorusListener() {
     finalChorusFired = false
     import('./animations/finalChorus.js').then(m => m.buildHallwayRoom())
@@ -300,199 +303,8 @@ async function init() {
     attachVerse2Listener()
     attachBridgeListener()
     attachFinalChorusListener()
+    attachFinalMemoryListener()
   }
-
-  // ─── Skip Intro ───────────────────────────────────────────────────
-  document.getElementById('skipTrigger').addEventListener('click', async () => {
-    document.getElementById('skipIntroBtn').style.display = 'none'
-    introAudio.pause()
-    introAudio.currentTime = 0
-    welcomeOverlay.classList.add('hidden')
-    theaterButtonOverlay.classList.add('hidden')
-    songControlsOverlay.classList.remove('hidden')
-    introHasFinished = true
-    fadeOverlay.classList.add('visible')
-    await wait(1000)
-    introRoom.setAttribute('visible', 'false')
-    cameraRig.setAttribute('position', '0 0 6')
-    await wait(300)
-    fadeOverlay.classList.remove('visible')
-    try {
-      songAudio.currentTime = 0
-      songAudio.volume = 0
-      await songAudio.play()
-      await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
-    } catch (e) { console.error('Song failed:', e) }
-    try {
-      await playApproachClip()
-      await transitionToMemoryRoom(startMemoryRoomSequence)
-      attachAllListeners()
-    } catch (e) { console.error('Skip intro transition failed:', e) }
-  })
-
-  // ─── Skip to Chorus 1 ────────────────────────────────────────────
-  document.getElementById('skipChorus1Trigger').addEventListener('click', async () => {
-    document.getElementById('skipIntroBtn').style.display = 'none'
-    document.getElementById('skipChorus1Btn').style.display = 'none'
-
-    const scene = document.querySelector('a-scene')
-    if (!scene.hasLoaded) {
-      await new Promise(resolve => scene.addEventListener('loaded', resolve, { once: true }))
-    }
-
-    introAudio.pause()
-    introAudio.currentTime = 0
-    welcomeOverlay.classList.add('hidden')
-    theaterButtonOverlay.classList.add('hidden')
-    songControlsOverlay.classList.remove('hidden')
-    introHasFinished = true
-
-    fadeOverlay.classList.add('visible')
-    await wait(800)
-    introRoom.setAttribute('visible', 'false')
-    await wait(300)
-
-    try {
-      songAudio.currentTime = 50
-      songAudio.volume = 0
-      await songAudio.play()
-      await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
-    } catch (e) { console.error('Song failed:', e) }
-
-    preChorusFired = true
-    bookFired = true
-    chorusFired = false
-
-    attachChorusListener()
-    attachPageFlipListener()
-    attachInstrumentalListener()
-    attachVerse2Listener()
-    attachBridgeListener()
-    attachFinalChorusListener()
-  })
-
-  // ─── Skip to Verse 2 ─────────────────────────────────────────────
-  document.getElementById('skipVerse2Trigger').addEventListener('click', async () => {
-    document.getElementById('skipIntroBtn').style.display = 'none'
-    document.getElementById('skipChorus1Btn').style.display = 'none'
-    document.getElementById('skipVerse2Btn').style.display = 'none'
-
-    const scene = document.querySelector('a-scene')
-    if (!scene.hasLoaded) {
-      await new Promise(resolve => scene.addEventListener('loaded', resolve, { once: true }))
-    }
-
-    introAudio.pause()
-    introAudio.currentTime = 0
-    welcomeOverlay.classList.add('hidden')
-    theaterButtonOverlay.classList.add('hidden')
-    songControlsOverlay.classList.remove('hidden')
-    introHasFinished = true
-
-    fadeOverlay.classList.add('visible')
-    await wait(800)
-    introRoom.setAttribute('visible', 'false')
-
-    try {
-      songAudio.currentTime = 99
-      songAudio.volume = 0
-      await songAudio.play()
-      await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
-    } catch (e) { console.error('Song failed:', e) }
-
-    preChorusFired    = true
-    bookFired         = true
-    chorusFired       = true
-    pageFlipFired     = true
-    instrumentalFired = true
-
-    attachVerse2Listener()
-    attachBridgeListener()
-    attachFinalChorusListener()
-  })
-
-  // ─── Skip to Bridge ───────────────────────────────────────────────
-  document.getElementById('skipBridgeTrigger').addEventListener('click', async () => {
-    document.getElementById('skipIntroBtn').style.display = 'none'
-    document.getElementById('skipChorus1Btn').style.display = 'none'
-    document.getElementById('skipVerse2Btn').style.display = 'none'
-    document.getElementById('skipBridgeBtn').style.display = 'none'
-
-    const scene = document.querySelector('a-scene')
-    if (!scene.hasLoaded) {
-      await new Promise(resolve => scene.addEventListener('loaded', resolve, { once: true }))
-    }
-
-    introAudio.pause()
-    introAudio.currentTime = 0
-    welcomeOverlay.classList.add('hidden')
-    theaterButtonOverlay.classList.add('hidden')
-    songControlsOverlay.classList.remove('hidden')
-    introHasFinished = true
-
-    fadeOverlay.classList.add('visible')
-    await wait(800)
-    introRoom.setAttribute('visible', 'false')
-
-    try {
-      songAudio.currentTime = 134
-      songAudio.volume = 0
-      await songAudio.play()
-      await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
-    } catch (e) { console.error('Song failed:', e) }
-
-    preChorusFired    = true
-    bookFired         = true
-    chorusFired       = true
-    pageFlipFired     = true
-    instrumentalFired = true
-    verse2Fired       = true
-
-    attachBridgeListener()
-    attachFinalChorusListener()
-  })
-
-  // ─── Skip to Final Chorus ────────────────────────────────────────
-  document.getElementById('skipFinalChorusTrigger').addEventListener('click', async () => {
-    document.getElementById('skipIntroBtn').style.display = 'none'
-    document.getElementById('skipChorus1Btn').style.display = 'none'
-    document.getElementById('skipVerse2Btn').style.display = 'none'
-    document.getElementById('skipBridgeBtn').style.display = 'none'
-    document.getElementById('skipFinalChorusBtn').style.display = 'none'
-
-    const scene = document.querySelector('a-scene')
-    if (!scene.hasLoaded) {
-      await new Promise(resolve => scene.addEventListener('loaded', resolve, { once: true }))
-    }
-
-    introAudio.pause()
-    introAudio.currentTime = 0
-    welcomeOverlay.classList.add('hidden')
-    theaterButtonOverlay.classList.add('hidden')
-    songControlsOverlay.classList.remove('hidden')
-    introHasFinished = true
-
-    fadeOverlay.classList.add('visible')
-    await wait(800)
-    introRoom.setAttribute('visible', 'false')
-
-    try {
-      songAudio.currentTime = 145
-      songAudio.volume = 0
-      await songAudio.play()
-      await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
-    } catch (e) { console.error('Song failed:', e) }
-
-    preChorusFired    = true
-    bookFired         = true
-    chorusFired       = true
-    pageFlipFired     = true
-    instrumentalFired = true
-    verse2Fired       = true
-    bridgeFired       = true
-
-    attachFinalChorusListener()
-  })
 
   // ─── Main flow ────────────────────────────────────────────────────
   startButton.addEventListener('click', async () => {
