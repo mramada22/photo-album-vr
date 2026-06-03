@@ -137,3 +137,18 @@ export async function transitionToChorus() {
   fadeOverlay.classList.remove('visible')
   startChorusSequence()
 }
+
+export async function transitionToBridge() {
+  const { fadeOverlay, cameraRig } = getElements()
+
+  // verse2.js already faded to black — screen is fully black when this is called
+  await wait(200)
+
+  const { buildBridgeRoom, startBridgeSequence } = await import('../animations/bridge.js')
+  buildBridgeRoom()
+
+  await wait(50)
+
+  fadeOverlay.classList.remove('visible')
+  startBridgeSequence()
+}

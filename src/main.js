@@ -33,6 +33,10 @@ document.querySelector('#app').innerHTML = `
     <button id="skipVerse2Trigger">Skip to Verse 2</button>
   </div>
 
+  <div id="skipBridgeBtn" style="position: fixed; top: 148px; right: 16px; z-index: 999;">
+    <button id="skipBridgeTrigger">Skip to Bridge</button>
+  </div>
+
   <div id="songControlsOverlay" class="controls-overlay hidden">
     <div class="controls-card">
       <button id="playSongButton">Play Song</button>
@@ -239,7 +243,6 @@ async function init() {
         verse2Fired = true
         songAudio.removeEventListener('timeupdate', verse2Check)
         import('./animations/verse2.js').then(m => {
-          // Hide chorus room before showing verse 2
           const chorusRoom = document.getElementById('chorusRoom')
           if (chorusRoom) chorusRoom.setAttribute('visible', 'false')
           m.startVerse2Sequence()
@@ -249,6 +252,23 @@ async function init() {
     songAudio.addEventListener('timeupdate', verse2Check)
   }
 
+  let bridgeFired = false, bridgeCheck = null
+  function attachBridgeListener() {
+    bridgeFired = false
+    // Preload bridge assets immediately when listener is attached
+    import('./animations/bridge.js').then(m => m.buildBridgeRoom())
+
+    if (bridgeCheck) songAudio.removeEventListener('timeupdate', bridgeCheck)
+    bridgeCheck = () => {
+      if (!bridgeFired && songAudio.currentTime >= 138) {
+        bridgeFired = true
+        songAudio.removeEventListener('timeupdate', bridgeCheck)
+        import('./scene/transitions.js').then(m => m.transitionToBridge())
+      }
+    }
+    songAudio.addEventListener('timeupdate', bridgeCheck)
+  }
+
   function attachAllListeners() {
     attachPreChorusListener()
     attachBookListener()
@@ -256,6 +276,7 @@ async function init() {
     attachPageFlipListener()
     attachInstrumentalListener()
     attachVerse2Listener()
+    attachBridgeListener()
   }
 
   // ─── Skip Intro ───────────────────────────────────────────────────
@@ -309,7 +330,6 @@ async function init() {
     introRoom.setAttribute('visible', 'false')
     await wait(300)
 
-    // Start song from just before chorus (50s) and attach remaining listeners
     try {
       songAudio.currentTime = 50
       songAudio.volume = 0
@@ -317,17 +337,16 @@ async function init() {
       await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
     } catch (e) { console.error('Song failed:', e) }
 
-    // Mark everything before chorus as fired
     preChorusFired = true
     bookFired = true
-    chorusFired = false  // chorus hasn't fired yet — let it trigger naturally at 50s
+    chorusFired = false
 
     attachChorusListener()
     attachPageFlipListener()
     attachInstrumentalListener()
     attachVerse2Listener()
+    attachBridgeListener()
   })
-
 
   // ─── Skip to Verse 2 ─────────────────────────────────────────────
   document.getElementById('skipVerse2Trigger').addEventListener('click', async () => {
@@ -358,13 +377,54 @@ async function init() {
       await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
     } catch (e) { console.error('Song failed:', e) }
 
-    preChorusFired = true
-    bookFired      = true
-    chorusFired    = true
-    pageFlipFired  = true
+    preChorusFired    = true
+    bookFired         = true
+    chorusFired       = true
+    pageFlipFired     = true
     instrumentalFired = true
 
     attachVerse2Listener()
+    attachBridgeListener()
+  })
+
+  // ─── Skip to Bridge ───────────────────────────────────────────────
+  document.getElementById('skipBridgeTrigger').addEventListener('click', async () => {
+    document.getElementById('skipIntroBtn').style.display = 'none'
+    document.getElementById('skipChorus1Btn').style.display = 'none'
+    document.getElementById('skipVerse2Btn').style.display = 'none'
+    document.getElementById('skipBridgeBtn').style.display = 'none'
+
+    const scene = document.querySelector('a-scene')
+    if (!scene.hasLoaded) {
+      await new Promise(resolve => scene.addEventListener('loaded', resolve, { once: true }))
+    }
+
+    introAudio.pause()
+    introAudio.currentTime = 0
+    welcomeOverlay.classList.add('hidden')
+    theaterButtonOverlay.classList.add('hidden')
+    songControlsOverlay.classList.remove('hidden')
+    introHasFinished = true
+
+    fadeOverlay.classList.add('visible')
+    await wait(800)
+    introRoom.setAttribute('visible', 'false')
+
+    try {
+      songAudio.currentTime = 138
+      songAudio.volume = 0
+      await songAudio.play()
+      await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
+    } catch (e) { console.error('Song failed:', e) }
+
+    preChorusFired    = true
+    bookFired         = true
+    chorusFired       = true
+    pageFlipFired     = true
+    instrumentalFired = true
+    verse2Fired       = true
+
+    attachBridgeListener()
   })
 
   // ─── Main flow ────────────────────────────────────────────────────
