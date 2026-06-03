@@ -144,6 +144,35 @@ export async function transitionToBridge() {
   // verse2.js already faded to black — screen is fully black when this is called
   await wait(200)
 
+  // Clean up all THREE.js meshes left on the floor by verse2 overlay assembly.
+  // assembleFromFragments adds plain Mesh objects directly to scene3D with no
+  // id or reference — find them by checking if they are floor-level planes.
+  const scene3D = document.querySelector('a-scene').object3D
+  const toRemove = []
+  scene3D.traverse(obj => {
+    if (
+      obj.isMesh &&
+      obj.parent === scene3D &&
+      obj.position.y < 0.1 &&
+      obj.geometry?.type === 'PlaneGeometry'
+    ) {
+      toRemove.push(obj)
+    }
+  })
+  toRemove.forEach(obj => {
+    if (obj.material) {
+      if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose())
+      else obj.material.dispose()
+    }
+    if (obj.geometry) obj.geometry.dispose()
+    scene3D.remove(obj)
+  })
+  console.log(`[bridge] cleaned up ${toRemove.length} verse2 floor meshes`)
+
+  // Hide verse2 room
+  const verse2Room = document.getElementById('verse2Room')
+  if (verse2Room) verse2Room.setAttribute('visible', 'false')
+
   const { buildBridgeRoom, startBridgeSequence } = await import('../animations/bridge.js')
   buildBridgeRoom()
 
@@ -151,4 +180,19 @@ export async function transitionToBridge() {
 
   fadeOverlay.classList.remove('visible')
   startBridgeSequence()
+}
+
+export async function transitionToFinalChorus() {
+  const { fadeOverlay } = getElements()
+
+  // bridge.js already faded to black — screen is fully black when this is called
+  await wait(200)
+
+  const { buildHallwayRoom, startFinalChorusSequence } = await import('../animations/finalChorus.js')
+  buildHallwayRoom()
+
+  await wait(50)
+
+  fadeOverlay.classList.remove('visible')
+  startFinalChorusSequence()
 }

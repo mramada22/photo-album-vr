@@ -37,6 +37,10 @@ document.querySelector('#app').innerHTML = `
     <button id="skipBridgeTrigger">Skip to Bridge</button>
   </div>
 
+  <div id="skipFinalChorusBtn" style="position: fixed; top: 192px; right: 16px; z-index: 999;">
+    <button id="skipFinalChorusTrigger">Skip to Final Chorus</button>
+  </div>
+
   <div id="songControlsOverlay" class="controls-overlay hidden">
     <div class="controls-card">
       <button id="playSongButton">Play Song</button>
@@ -67,6 +71,7 @@ document.querySelector('#app').innerHTML = `
       <audio id="songAudio"  src="/audio/song.mp3"  preload="auto"></audio>
       <img id="earthTexture" src="/images/earth.jpg" crossorigin="anonymous">
       <a-asset-item id="preChorusFiguresAsset" src="/models/prechorus_figures.glb"></a-asset-item>
+      <a-asset-item id="hallwayModel" src="/models/hallway.glb"></a-asset-item>
     </a-assets>
 
     <a-sky id="sky" color="#000005"></a-sky>
@@ -236,6 +241,8 @@ async function init() {
     verse2Fired = false
     // Preload verse2 assets immediately when listener is attached
     import('./animations/verse2.js').then(m => m.buildVerse2Room())
+    // Also preload bridge room early so it's ready well before 136s
+    import('./animations/bridge.js').then(m => m.buildBridgeRoom())
 
     if (verse2Check) songAudio.removeEventListener('timeupdate', verse2Check)
     verse2Check = () => {
@@ -253,14 +260,29 @@ async function init() {
   }
 
   let bridgeFired = false, bridgeCheck = null
+  let finalChorusFired = false, finalChorusCheck = null
+  function attachFinalChorusListener() {
+    finalChorusFired = false
+    import('./animations/finalChorus.js').then(m => m.buildHallwayRoom())
+    if (finalChorusCheck) songAudio.removeEventListener('timeupdate', finalChorusCheck)
+    finalChorusCheck = () => {
+      if (!finalChorusFired && songAudio.currentTime >= 145) {
+        finalChorusFired = true
+        songAudio.removeEventListener('timeupdate', finalChorusCheck)
+        import('./scene/transitions.js').then(m => m.transitionToFinalChorus())
+      }
+    }
+    songAudio.addEventListener('timeupdate', finalChorusCheck)
+  }
+
   function attachBridgeListener() {
     bridgeFired = false
-    // Preload bridge assets immediately when listener is attached
+    // Preload bridge assets early so room is ready before 136s
     import('./animations/bridge.js').then(m => m.buildBridgeRoom())
 
     if (bridgeCheck) songAudio.removeEventListener('timeupdate', bridgeCheck)
     bridgeCheck = () => {
-      if (!bridgeFired && songAudio.currentTime >= 136) {
+      if (!bridgeFired && songAudio.currentTime >= 134) {
         bridgeFired = true
         songAudio.removeEventListener('timeupdate', bridgeCheck)
         import('./scene/transitions.js').then(m => m.transitionToBridge())
@@ -277,12 +299,12 @@ async function init() {
     attachInstrumentalListener()
     attachVerse2Listener()
     attachBridgeListener()
+    attachFinalChorusListener()
   }
 
   // ─── Skip Intro ───────────────────────────────────────────────────
   document.getElementById('skipTrigger').addEventListener('click', async () => {
     document.getElementById('skipIntroBtn').style.display = 'none'
-    document.getElementById('skipPreChorusBtn').style.display = 'none'
     introAudio.pause()
     introAudio.currentTime = 0
     welcomeOverlay.classList.add('hidden')
@@ -346,6 +368,7 @@ async function init() {
     attachInstrumentalListener()
     attachVerse2Listener()
     attachBridgeListener()
+    attachFinalChorusListener()
   })
 
   // ─── Skip to Verse 2 ─────────────────────────────────────────────
@@ -385,6 +408,7 @@ async function init() {
 
     attachVerse2Listener()
     attachBridgeListener()
+    attachFinalChorusListener()
   })
 
   // ─── Skip to Bridge ───────────────────────────────────────────────
@@ -411,7 +435,7 @@ async function init() {
     introRoom.setAttribute('visible', 'false')
 
     try {
-      songAudio.currentTime = 136
+      songAudio.currentTime = 134
       songAudio.volume = 0
       await songAudio.play()
       await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
@@ -425,6 +449,49 @@ async function init() {
     verse2Fired       = true
 
     attachBridgeListener()
+    attachFinalChorusListener()
+  })
+
+  // ─── Skip to Final Chorus ────────────────────────────────────────
+  document.getElementById('skipFinalChorusTrigger').addEventListener('click', async () => {
+    document.getElementById('skipIntroBtn').style.display = 'none'
+    document.getElementById('skipChorus1Btn').style.display = 'none'
+    document.getElementById('skipVerse2Btn').style.display = 'none'
+    document.getElementById('skipBridgeBtn').style.display = 'none'
+    document.getElementById('skipFinalChorusBtn').style.display = 'none'
+
+    const scene = document.querySelector('a-scene')
+    if (!scene.hasLoaded) {
+      await new Promise(resolve => scene.addEventListener('loaded', resolve, { once: true }))
+    }
+
+    introAudio.pause()
+    introAudio.currentTime = 0
+    welcomeOverlay.classList.add('hidden')
+    theaterButtonOverlay.classList.add('hidden')
+    songControlsOverlay.classList.remove('hidden')
+    introHasFinished = true
+
+    fadeOverlay.classList.add('visible')
+    await wait(800)
+    introRoom.setAttribute('visible', 'false')
+
+    try {
+      songAudio.currentTime = 145
+      songAudio.volume = 0
+      await songAudio.play()
+      await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)
+    } catch (e) { console.error('Song failed:', e) }
+
+    preChorusFired    = true
+    bookFired         = true
+    chorusFired       = true
+    pageFlipFired     = true
+    instrumentalFired = true
+    verse2Fired       = true
+    bridgeFired       = true
+
+    attachFinalChorusListener()
   })
 
   // ─── Main flow ────────────────────────────────────────────────────
