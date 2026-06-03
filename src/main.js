@@ -260,7 +260,7 @@ async function init() {
 
     if (bridgeCheck) songAudio.removeEventListener('timeupdate', bridgeCheck)
     bridgeCheck = () => {
-      if (!bridgeFired && songAudio.currentTime >= 138) {
+      if (!bridgeFired && songAudio.currentTime >= 136) {
         bridgeFired = true
         songAudio.removeEventListener('timeupdate', bridgeCheck)
         import('./scene/transitions.js').then(m => m.transitionToBridge())
@@ -411,7 +411,7 @@ async function init() {
     introRoom.setAttribute('visible', 'false')
 
     try {
-      songAudio.currentTime = 138
+      songAudio.currentTime = 136
       songAudio.volume = 0
       await songAudio.play()
       await fadeAudio(songAudio, 0, SONG_TARGET_VOLUME, FADE_DURATION)

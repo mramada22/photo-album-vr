@@ -54,39 +54,70 @@ export function buildBridgeRoom() {
   floor.setAttribute('rotation', '-90 0 0')
   floor.setAttribute('width', '30')
   floor.setAttribute('height', '30')
-  floor.setAttribute('material', 'color: #f5ede0; roughness: 0.8; shader: flat')
+  floor.setAttribute('material', 'color: #3d2a1a; roughness: 1')
   room.appendChild(floor)
 
+  // Back wall
+  const wallBack = document.createElement('a-plane')
+  wallBack.setAttribute('position', '0 5 -8')
+  wallBack.setAttribute('width', '30')
+  wallBack.setAttribute('height', '12')
+  wallBack.setAttribute('material', 'color: #2a1a0e; roughness: 1')
+  room.appendChild(wallBack)
+
+  // Left wall
+  const wallLeft = document.createElement('a-plane')
+  wallLeft.setAttribute('position', '-8 5 0')
+  wallLeft.setAttribute('rotation', '0 90 0')
+  wallLeft.setAttribute('width', '30')
+  wallLeft.setAttribute('height', '12')
+  wallLeft.setAttribute('material', 'color: #2a1a0e; roughness: 1')
+  room.appendChild(wallLeft)
+
+  // Right wall
+  const wallRight = document.createElement('a-plane')
+  wallRight.setAttribute('position', '8 5 0')
+  wallRight.setAttribute('rotation', '0 -90 0')
+  wallRight.setAttribute('width', '30')
+  wallRight.setAttribute('height', '12')
+  wallRight.setAttribute('material', 'color: #2a1a0e; roughness: 1')
+  room.appendChild(wallRight)
+
+  // Lights start dim — brighten during walk as characters approach
   const ambient = document.createElement('a-light')
+  ambient.setAttribute('id', 'bridgeAmbient')
   ambient.setAttribute('type', 'ambient')
   ambient.setAttribute('color', '#fff5e6')
-  ambient.setAttribute('intensity', '0.8')
+  ambient.setAttribute('intensity', '0.2')
   room.appendChild(ambient)
 
   const spot = document.createElement('a-light')
+  spot.setAttribute('id', 'bridgeSpot')
   spot.setAttribute('type', 'spot')
   spot.setAttribute('position', '0 6 0')
   spot.setAttribute('rotation', '-90 0 0')
   spot.setAttribute('color', '#ffe8a0')
-  spot.setAttribute('intensity', '3.5')
+  spot.setAttribute('intensity', '1.0')
   spot.setAttribute('angle', '30')
   spot.setAttribute('penumbra', '0.6')
   spot.setAttribute('distance', '12')
   room.appendChild(spot)
 
   const fillL = document.createElement('a-light')
+  fillL.setAttribute('id', 'bridgeFillL')
   fillL.setAttribute('type', 'point')
   fillL.setAttribute('position', '-4 2 0')
   fillL.setAttribute('color', '#fff0d0')
-  fillL.setAttribute('intensity', '1.2')
+  fillL.setAttribute('intensity', '0.3')
   fillL.setAttribute('distance', '10')
   room.appendChild(fillL)
 
   const fillR = document.createElement('a-light')
+  fillR.setAttribute('id', 'bridgeFillR')
   fillR.setAttribute('type', 'point')
   fillR.setAttribute('position', '4 2 0')
   fillR.setAttribute('color', '#fff0d0')
-  fillR.setAttribute('intensity', '1.2')
+  fillR.setAttribute('intensity', '0.3')
   fillR.setAttribute('distance', '10')
   room.appendChild(fillR)
 
@@ -158,7 +189,7 @@ export async function startBridgeSequence() {
   const fadeInT0 = performance.now()
   await new Promise(resolve => {
     ;(function tick() {
-      const t = Math.min((performance.now() - fadeInT0) / 800, 1)
+      const t = Math.min((performance.now() - fadeInT0) / 300, 1)
       fadePane.setAttribute('material', `color: #000000; shader: flat; transparent: true; opacity: ${(1-t).toFixed(3)}; depthTest: false`)
       if (t < 1) requestAnimationFrame(tick)
       else { camEl.removeChild(fadePane); resolve() }
@@ -175,6 +206,30 @@ export async function startBridgeSequence() {
     `property: position; from: ${-START_DISTANCE} 0 0; to: -0.8 0 0; dur: ${WALK_DURATION}; easing: linear; loop: false`)
   char2El.setAttribute('animation__walk',
     `property: position; from: ${START_DISTANCE} 0 0; to: 0.8 0 0; dur: ${WALK_DURATION}; easing: linear; loop: false`)
+
+  // Slow camera push + light brightening during the walk
+  const walkPushStart = rigObj.position.z
+  const walkPushEnd = walkPushStart - 2.0
+  const ambientEl  = document.getElementById('bridgeAmbient')
+  const spotEl     = document.getElementById('bridgeSpot')
+  const fillLEl    = document.getElementById('bridgeFillL')
+  const fillREl    = document.getElementById('bridgeFillR')
+  const walkPushT0 = performance.now()
+  ;(function walkPushTick() {
+    const t = Math.min((performance.now() - walkPushT0) / WALK_DURATION, 1)
+    const e = easeInOutQuad(t)
+
+    // Camera push
+    rigObj.position.z = walkPushStart + (walkPushEnd - walkPushStart) * e
+
+    // Lights brighten from dim → full as characters approach
+    if (ambientEl) ambientEl.setAttribute('light', `type: ambient; color: #fff5e6; intensity: ${(0.2 + 0.6 * e).toFixed(3)}`)
+    if (spotEl)    spotEl.setAttribute('light',    `type: spot; color: #ffe8a0; intensity: ${(1.0 + 2.5 * e).toFixed(3)}`)
+    if (fillLEl)   fillLEl.setAttribute('light',   `type: point; color: #fff0d0; intensity: ${(0.3 + 0.9 * e).toFixed(3)}`)
+    if (fillREl)   fillREl.setAttribute('light',   `type: point; color: #fff0d0; intensity: ${(0.3 + 0.9 * e).toFixed(3)}`)
+
+    if (t < 1) requestAnimationFrame(walkPushTick)
+  })()
 
   await wait(WALK_DURATION)
 
@@ -196,7 +251,7 @@ export async function startBridgeSequence() {
       // Remove first to ensure clean reinit, then wait a frame before re-adding
       el.removeAttribute('animation-mixer')
       requestAnimationFrame(() => {
-        el.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1; crossFadeDuration: 0.3')
+        el.setAttribute('animation-mixer', 'clip: *; loop: once; clampWhenFinished: true; timeScale: 0.4; crossFadeDuration: 0.8')
         el.setAttribute('visible', 'true')
         resolve()
       })
@@ -210,8 +265,25 @@ export async function startBridgeSequence() {
     swapToIdle(char2El, 'bridgeChar2Idle', 0.8),
   ])
 
-  // Hold on the embrace moment — 8 seconds
-  await wait(8000)
+  // Hold until 2:31 (151s) — scene started at 136s, walk=5s, swap~0.5s
+  // At 2:26 (4.5s into idle) start a slow gentle push in
+  await wait(500)
+
+  // Slow camera push in over 1.5s — subtle, doesn't reach the characters
+  const pushT0 = performance.now()
+  const pushStart = rigObj.position.z
+  const pushEnd = Math.max(pushStart - 1.5, 1.5)  // push in 1.5 units, don't go closer than 1.5
+  await new Promise(resolve => {
+    ;(function tick() {
+      const t = Math.min((performance.now() - pushT0) / 1500, 1)
+      const e = easeOutCubic(t)
+      rigObj.position.z = pushStart + (pushEnd - pushStart) * e
+      if (t < 1) requestAnimationFrame(tick)
+      else resolve()
+    })()
+  })
+
+  await wait(1000)
 
   // ── Fade to black → final chorus ─────────────────────────────────
   fadeOverlay.classList.add('visible')
