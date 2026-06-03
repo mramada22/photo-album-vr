@@ -68,7 +68,7 @@ export async function startPageFlipSequence() {
         liftT = 1 - easeOutCubic((rawT - 0.55) / 0.45)
       }
       // landY: 0.022 puts page0 above page1 (0.013) and page2 (0.016)
-      const landY = 0.022
+      const landY = 0.06
       const baseY = rawT >= 0.55 
         ? landY                          // returning: aim for new higher landing spot
         : startPos.y                     // lifting: start from original position
@@ -98,7 +98,7 @@ export async function startPageFlipSequence() {
       if (rawT < 1) requestAnimationFrame(tick)
       else {
         // Snap back to exact start position/rotation
-        pageObj.position.set(startPos.x, 0.022, startPos.z)
+        pageObj.position.set(startPos.x, 0.06, startPos.z)
         pageObj.rotation.set(startRot.x, startRot.y, startRot.z)
         resolve()
       }
@@ -174,7 +174,6 @@ export async function runPageFlipAndFade() {
   // Wait for lift animation to fully complete (page back on floor)
   await liftPromise
 
-  // ── Fade to black at 1:23 ─────────────────────────────────────────
-  await wait(200) // tiny beat after page settles
-  fadeOverlay.classList.add('visible')
+  // No fade to black here — instrumental.js takes over at 1:23
+  console.log('[pageFlip] complete — handing off to instrumental')
 }

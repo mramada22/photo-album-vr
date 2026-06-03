@@ -71,7 +71,7 @@ function buildPage(index, spot, startOnFloor) {
 
   // Each page sits slightly higher than the previous so later pages
   // visually stack on top — 0.003 per page is enough to prevent z-fighting
-  const landY = 0.01 + index * 0.003
+  const landY = 0.01 + index * 0.015
 
   const page = document.createElement('a-entity')
   page.setAttribute('id', `chorusPage${index}`)
@@ -94,16 +94,16 @@ function buildPage(index, spot, startOnFloor) {
   const border = document.createElement('a-plane')
   border.setAttribute('width',  '0.74')
   border.setAttribute('height', '0.99')
-  border.setAttribute('position', '0 0 0.002')
-  border.setAttribute('material', 'color: #5c3a1e; roughness: 0.9; shader: flat; side: double')
+  border.setAttribute('position', '0 0 0')
+  border.setAttribute('material', 'color: #5c3a1e; shader: flat; side: double; polygonOffset: true; polygonOffsetFactor: 4; polygonOffsetUnits: 4')
   page.appendChild(border)
 
   // Cream page background
   const bg = document.createElement('a-plane')
   bg.setAttribute('width',  '0.7')
   bg.setAttribute('height', '0.95')
-  bg.setAttribute('position', '0 0 0.004')
-  bg.setAttribute('material', 'color: #f0e6d0; roughness: 0.8; shader: flat; side: double')
+  bg.setAttribute('position', '0 0 0.015')
+  bg.setAttribute('material', 'color: #f0e6d0; shader: flat; side: double; polygonOffset: true; polygonOffsetFactor: 2; polygonOffsetUnits: 2')
   page.appendChild(bg)
 
   // Photo area — topmost layer
@@ -111,8 +111,8 @@ function buildPage(index, spot, startOnFloor) {
   photo.setAttribute('id', `chorusPhoto${index}`)
   photo.setAttribute('width',  '0.532')
   photo.setAttribute('height', '0.722')
-  photo.setAttribute('position', '0 0 0.006')
-  photo.setAttribute('material', 'color: #1a1a1a; roughness: 0.5; shader: flat; side: double')
+  photo.setAttribute('position', '0 0 0.03')
+  photo.setAttribute('material', 'color: #1a1a1a; shader: flat; side: double; polygonOffset: true; polygonOffsetFactor: 1; polygonOffsetUnits: 1')
 
   page.appendChild(photo)
   chorusRoom.appendChild(page)
@@ -174,7 +174,7 @@ async function dropPage(index) {
   const page = buildPage(index, spot, false)
   await wait(100)
   page.setAttribute('visible', 'true')
-  const landY = 0.01 + index * 0.003
+  const landY = 0.01 + index * 0.015
   page.setAttribute('animation__fall', {
     property: 'position',
     from:     `${spot.x} 5.5 ${spot.z}`,
@@ -265,7 +265,7 @@ function flutterFall(pageObj, shadowEl, spot, durationMs) {
       if (rawT < 1) {
         requestAnimationFrame(tick)
       } else {
-        pageObj.position.set(spot.x, 0.01, spot.z)  // page0 always index 0
+        pageObj.position.set(spot.x, 0.01, spot.z)
         pageObj.rotation.set(-Math.PI / 2, baseRyRad, 0)
         if (shadowEl) {
           shadowEl.object3D.position.set(spot.x, 0.005, spot.z)
