@@ -6,10 +6,12 @@ const PAGE_VIDEOS = [
   '/videos/page1.mp4',
   '/videos/page2.mp4',
   '/videos/page3.mp4',
-  '/videos/page4.mp4',
 ]
 
-const LAND_DELAYS = [0, 8000, 18000, 28000]
+const LAND_DELAYS = [0, 8000 - 2500, 18000 - 3500]  // page 2 starts 1s earlier
+
+// Module-level map of photo plane references — bypasses getElementById on children
+const photoPlanes = {}
 
 // All pages land near the origin so the spotlight hits them
 // and the bird's-eye camera at (0, 6.5, 0) sees everything
@@ -67,16 +69,15 @@ function buildPage(index, spot, startOnFloor) {
   const chorusRoom = document.getElementById('chorusRoom')
   buildVideoAsset(index)
 
-  const page = document.createElement('a-plane')
+  // Each page sits slightly higher than the previous so later pages
+  // visually stack on top — 0.003 per page is enough to prevent z-fighting
+  const landY = 0.01 + index * 0.003
+
+  const page = document.createElement('a-entity')
   page.setAttribute('id', `chorusPage${index}`)
-  page.setAttribute('width',  '0.7')
-  page.setAttribute('height', '0.95')
-  page.setAttribute('side', 'double')
-  // Debug: bright red so it's impossible to miss
-  page.setAttribute('material', `color: #ff2222; roughness: 0.3; emissive: #ff0000; emissiveIntensity: 0.8`)
 
   if (startOnFloor) {
-    page.setAttribute('position', `${spot.x} 0.01 ${spot.z}`)
+    page.setAttribute('position', `${spot.x} ${landY} ${spot.z}`)
     page.setAttribute('rotation', `-90 ${spot.ry} 0`)
     page.setAttribute('visible', 'true')
   } else {
@@ -85,7 +86,38 @@ function buildPage(index, spot, startOnFloor) {
     page.setAttribute('visible', 'false')
   }
 
+  // Layer order (front to back, all offset forward from entity origin):
+  // photo (z:0.006) → cream bg (z:0.004) → brown border (z:0.002)
+  // This ensures border is always visible above any underlying page
+
+  // Brown border — bottommost layer, still in front of floor
+  const border = document.createElement('a-plane')
+  border.setAttribute('width',  '0.74')
+  border.setAttribute('height', '0.99')
+  border.setAttribute('position', '0 0 0.002')
+  border.setAttribute('material', 'color: #5c3a1e; roughness: 0.9; shader: flat; side: double')
+  page.appendChild(border)
+
+  // Cream page background
+  const bg = document.createElement('a-plane')
+  bg.setAttribute('width',  '0.7')
+  bg.setAttribute('height', '0.95')
+  bg.setAttribute('position', '0 0 0.004')
+  bg.setAttribute('material', 'color: #f0e6d0; roughness: 0.8; shader: flat; side: double')
+  page.appendChild(bg)
+
+  // Photo area — topmost layer
+  const photo = document.createElement('a-plane')
+  photo.setAttribute('id', `chorusPhoto${index}`)
+  photo.setAttribute('width',  '0.532')
+  photo.setAttribute('height', '0.722')
+  photo.setAttribute('position', '0 0 0.006')
+  photo.setAttribute('material', 'color: #1a1a1a; roughness: 0.5; shader: flat; side: double')
+
+  page.appendChild(photo)
   chorusRoom.appendChild(page)
+
+  photoPlanes[index] = photo
   return page
 }
 
@@ -101,16 +133,52 @@ function buildShadow(spot) {
   return shadow
 }
 
+// Activates the video on a page by replacing the photo plane entirely
+// (setAttribute alone doesn't reliably reinitialize the material in A-Frame)
+function fadeInVideo(photo, index, duration) {
+  // Set video src at opacity 0 first — keeps black background visible,
+  // no white flash from default material color
+  photo.setAttribute('material', `src: #chorusVideo${index}; shader: flat; side: double; transparent: true; opacity: 0; color: #000000`)
+  // Wait two frames for the material to initialize before fading in
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const t0 = performance.now()
+    ;(function tick() {
+      const t = Math.min((performance.now() - t0) / duration, 1)
+      photo.setAttribute('material', `src: #chorusVideo${index}; shader: flat; side: double; transparent: ${t < 1}; opacity: ${t.toFixed(3)}; color: #ffffff`)
+      if (t < 1) requestAnimationFrame(tick)
+    })()
+  }))
+}
+
+export function activatePageVideo(index) {
+  const vid = document.getElementById(`chorusVideo${index}`)
+  if (!vid) { console.warn(`chorusVideo${index} not found`); return }
+
+  vid.muted = true
+  vid.play().catch(e => console.warn(`video${index} play failed`, e))
+
+  // Use direct reference stored during buildPage — no getElementById needed
+  const photo = photoPlanes[index]
+  if (!photo) { console.warn(`photoPlanes[${index}] not found`); return }
+
+  console.log(`[chorus] activating video ${index} on`, photo)
+  // Set to black first to avoid white flash, then fade in via RAF
+  photo.setAttribute('material', 'color: #000000; shader: flat; side: double')
+  requestAnimationFrame(() => fadeInVideo(photo, index, 1200))
+}
+
 async function dropPage(index) {
   const spot = LANDING_SPOTS[index]
   dbg(`dropPage(${index}) start`)
+
   const page = buildPage(index, spot, false)
   await wait(100)
   page.setAttribute('visible', 'true')
+  const landY = 0.01 + index * 0.003
   page.setAttribute('animation__fall', {
     property: 'position',
     from:     `${spot.x} 5.5 ${spot.z}`,
-    to:       `${spot.x} 0.01 ${spot.z}`,
+    to:       `${spot.x} ${landY} ${spot.z}`,
     dur:      2500,
     easing:   'easeInQuad'
   })
@@ -123,8 +191,9 @@ async function dropPage(index) {
   })
   await wait(2500)
   dbg(`dropPage(${index}) landed`)
-  const vid = document.getElementById(`chorusVideo${index}`)
-  if (vid) vid.play().catch(() => {})
+  activatePageVideo(index)
+  // Swap placeholder to video once landed exist:
+  // activatePageVideo(index)
 }
 
 function cleanupPreChorusDebris() {
@@ -142,7 +211,7 @@ function cleanupPreChorusDebris() {
 function flutterFall(pageObj, shadowEl, spot, durationMs) {
   return new Promise(resolve => {
     const startY    = 3.5
-    const endY      = 0.01
+    const endY      = 0.01  // page0 is always index 0, no offset needed
     const totalDist = startY - endY
     const wobbleFreq = 2.8
     const wobbleAmpZ = 18
@@ -196,7 +265,7 @@ function flutterFall(pageObj, shadowEl, spot, durationMs) {
       if (rawT < 1) {
         requestAnimationFrame(tick)
       } else {
-        pageObj.position.set(spot.x, endY, spot.z)
+        pageObj.position.set(spot.x, 0.01, spot.z)  // page0 always index 0
         pageObj.rotation.set(-Math.PI / 2, baseRyRad, 0)
         if (shadowEl) {
           shadowEl.object3D.position.set(spot.x, 0.005, spot.z)
@@ -225,7 +294,7 @@ export function buildChorusRoom() {
   floor.setAttribute('rotation', '-90 0 0')
   floor.setAttribute('width',  '20')
   floor.setAttribute('height', '20')
-  floor.setAttribute('material', 'color: #1a1a2e; roughness: 1')
+  floor.setAttribute('material', 'color: #0a0a0a; roughness: 1')
   room.appendChild(floor)
 
   // Walls
@@ -239,7 +308,7 @@ export function buildChorusRoom() {
     wall.setAttribute('rotation', w.rot)
     wall.setAttribute('width',  '20')
     wall.setAttribute('height', '6')
-    wall.setAttribute('material', 'color: #16213e; roughness: 1')
+    wall.setAttribute('material', 'color: #111111; roughness: 1')
     room.appendChild(wall)
   })
 
@@ -248,7 +317,7 @@ export function buildChorusRoom() {
   spotLight.setAttribute('type', 'spot')
   spotLight.setAttribute('position', `${SPOT0.x} 6 ${SPOT0.z}`)
   spotLight.setAttribute('rotation', '-90 0 0')
-  spotLight.setAttribute('intensity', '8')
+  spotLight.setAttribute('intensity', '6')
   spotLight.setAttribute('color', '#fff5e0')
   spotLight.setAttribute('angle', '30')
   spotLight.setAttribute('penumbra', '0.4')
@@ -258,10 +327,14 @@ export function buildChorusRoom() {
   // Bright ambient for debug visibility
   const ambient = document.createElement('a-light')
   ambient.setAttribute('type', 'ambient')
-  ambient.setAttribute('intensity', '1.2')
+  ambient.setAttribute('intensity', '0.35')
   room.appendChild(ambient)
 
   scene.appendChild(room)
+
+  // Preload all video assets now so they're ready when pages land
+  for (let i = 0; i < 3; i++) buildVideoAsset(i)
+
   dbg('buildChorusRoom() done')
 }
 
@@ -278,6 +351,7 @@ export async function startChorusSequence() {
   const { cameraRig } = getElements()
   const cam = document.getElementById('camera')
 
+  // Disable look-controls FIRST, then reset yaw so the reset sticks
   if (cam) cam.setAttribute('look-controls', 'enabled: false')
 
   ;['animation__swing1','animation__swing2','animation__follow1','animation__follow2',
@@ -289,11 +363,17 @@ export async function startChorusSequence() {
   const rigObj = cameraRig.object3D
   const toRad  = d => d * Math.PI / 180
 
-  // Snap camera to CAM_WATCH — directly looking at SPOT0
-  // Reset look-controls yaw so it doesn't fight our rotation
+  // Reset yaw after disabling look-controls so it can't re-apply the stored value
   try {
     const rlc = cam && cam.components['resettable-look-controls']
-    if (rlc) rlc.resetYaw(0)
+    if (rlc) {
+      rlc.resetYaw(Math.PI)
+      // Also zero out the pitch object directly
+      if (rlc.lc) {
+        rlc.lc.yawObject.rotation.y = Math.PI
+        rlc.lc.pitchObject.rotation.x = 0
+      }
+    }
   } catch(e) { console.warn('yaw reset failed', e) }
 
   rigObj.position.set(CAM_WATCH.x, CAM_WATCH.y, CAM_WATCH.z)
@@ -322,8 +402,7 @@ export async function startChorusSequence() {
   await flutterFall(pageObj, shadowEl, SPOT0, fallDur)
   dbg('page0 landed')
 
-  const vid0 = document.getElementById('chorusVideo0')
-  if (vid0) vid0.play().catch(() => {})
+  activatePageVideo(0)
 
   // ── Phase 2: Crane straight to bird's-eye ───────────────────────
   const craneStartPos = rigObj.position.clone()
@@ -365,7 +444,7 @@ export async function startChorusSequence() {
   }
 
   // ── Remaining pages fall in under bird's-eye ──────────────────────
-  for (let i = 1; i < 4; i++) {
+  for (let i = 1; i < 3; i++) {
     wait(LAND_DELAYS[i] - LAND_DELAYS[1]).then(() => dropPage(i))
   }
 }

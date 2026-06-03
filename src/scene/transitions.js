@@ -117,7 +117,13 @@ export async function transitionToChorus() {
   // doesn't fight our programmatic snap and cause a spin
   try {
     const rlc = cam && cam.components['resettable-look-controls']
-    if (rlc) rlc.resetYaw(0)
+    if (rlc) {
+      rlc.resetYaw(Math.PI)
+      if (rlc.lc) {
+        rlc.lc.yawObject.rotation.y = Math.PI
+        rlc.lc.pitchObject.rotation.x = 0
+      }
+    }
   } catch(e) { console.warn('yaw reset failed', e) }
 
   rigObj.position.set(0, 3.5, 3.0)

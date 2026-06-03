@@ -195,10 +195,25 @@ async function init() {
     songAudio.addEventListener('timeupdate', chorusCheck)
   }
 
+  let pageFlipFired = false, pageFlipCheck = null
+  function attachPageFlipListener() {
+    pageFlipFired = false
+    if (pageFlipCheck) songAudio.removeEventListener('timeupdate', pageFlipCheck)
+    pageFlipCheck = () => {
+      if (!pageFlipFired && songAudio.currentTime >= 74) {
+        pageFlipFired = true
+        songAudio.removeEventListener('timeupdate', pageFlipCheck)
+        import('./animations/pageFlip.js').then(m => m.runPageFlipAndFade())
+      }
+    }
+    songAudio.addEventListener('timeupdate', pageFlipCheck)
+  }
+
   function attachAllListeners() {
     attachPreChorusListener()
     attachBookListener()
     attachChorusListener()
+    attachPageFlipListener()
   }
 
   // ─── Skip Intro ───────────────────────────────────────────────────
@@ -262,10 +277,11 @@ async function init() {
     } catch (e) { console.error('Song failed:', e) }
 
     // Mark pre-chorus as already fired so it doesn't re-trigger,
-    // then attach book and chorus listeners from here
+    // then attach book, chorus and pageFlip listeners from here
     preChorusFired = true
     attachBookListener()
     attachChorusListener()
+    attachPageFlipListener()
 
     // Transition directly into pre-chorus scene
     await transitionToPreChorus()
